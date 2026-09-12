@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
-import { ArrowLeft, Cable, PlugZap, Unplug, Volume2 } from 'lucide-react'
+import { createFileRoute } from '@tanstack/react-router'
+import { Cable, PlugZap, Unplug, Volume2 } from 'lucide-react'
 import {
   useEffect,
   useEffectEvent,
@@ -11,7 +11,7 @@ import { SerialProvider, useSerialPort } from 'react-web-serial'
 
 import { Alert, AlertDescription, AlertTitle } from '#/components/ui/alert'
 import { Badge } from '#/components/ui/badge'
-import { Button, buttonVariants } from '#/components/ui/button'
+import { Button } from '#/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader } from '#/components/ui/card'
 import { cn } from '#/lib/utils'
 
@@ -210,11 +210,11 @@ function Keys() {
 
   if (!isClient) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#071016] px-4 text-slate-100">
-        <Card className="w-full max-w-lg rounded-2xl border border-white/10 bg-white/[0.03] py-10 text-center font-mono text-sm text-slate-500 ring-0">
+      <div className="grid min-h-96 place-items-center p-4">
+        <Card className="w-full max-w-lg py-10 text-center font-mono text-sm text-muted-foreground">
           Initializing fruit keyboard...
         </Card>
-      </main>
+      </div>
     )
   }
 
@@ -413,111 +413,68 @@ function KeysWorkspace() {
         : 'Waiting for a key'
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#071016] px-4 py-5 text-slate-100 sm:px-6 lg:px-8 lg:py-8">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_0%,rgba(34,211,238,0.12),transparent_34%),radial-gradient(circle_at_85%_20%,rgba(129,140,248,0.1),transparent_28%)]"
-      />
-      <div className="relative mx-auto max-w-7xl">
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
-          <Link
-            to="/"
-            className={cn(
-              buttonVariants({ variant: 'ghost' }),
-              'group gap-2 px-1 font-mono text-xs tracking-[0.16em] text-slate-400 uppercase hover:bg-white/5 hover:text-cyan-300',
-            )}
-          >
-            <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-1" />
-            Serial console
-          </Link>
-          <Badge
-            variant="outline"
-            className="h-auto gap-2 border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-1.5 font-mono text-[0.65rem] font-semibold tracking-[0.16em] text-cyan-300 uppercase"
-          >
-            <span className="size-1.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.9)]" />
-            Browser + serial
-          </Badge>
-        </header>
-
-        <section className="grid gap-10 py-10 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end lg:gap-16 lg:py-16">
-          <div>
-            <p className="mb-5 flex items-center gap-3 font-mono text-xs font-semibold tracking-[0.24em] text-cyan-400 uppercase">
-              <span className="text-slate-600">01</span>
-              Fruit keyboard
-            </p>
-            <h1 className="max-w-3xl text-4xl leading-[1.05] font-semibold tracking-[-0.04em] text-slate-50 sm:text-6xl lg:text-7xl">
-              Make music
-              <br />
-              <span className="text-cyan-300">from the produce aisle.</span>
-            </h1>
-            <p className="mt-6 max-w-xl text-base leading-7 text-slate-400 sm:text-lg">
-              Connect an Arduino fruit keyboard, tap a browser key, or use a
-              shortcut. Every input follows the same local audio path.
-            </p>
-
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <div className="flex min-w-64 items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
-                <span
-                  className={`size-2.5 rounded-full ${audioError ? 'bg-rose-300' : audioState === 'ready' ? 'bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,0.8)]' : 'bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.8)]'}`}
-                />
-                <div className="min-w-0">
-                  <p className="font-mono text-[0.65rem] tracking-[0.16em] text-slate-500 uppercase">
-                    Browser audio
-                  </p>
-                  <p className="truncate text-sm font-medium text-slate-200">
-                    {audioStatus}
-                  </p>
-                </div>
-              </div>
-              <Badge
-                variant="outline"
-                className="h-auto rounded-xl border-white/10 px-4 py-3 font-mono text-[0.68rem] tracking-[0.08em] text-slate-500 uppercase"
-              >
-                Arduino optional
-              </Badge>
-            </div>
-            {audioError && (
-              <Alert className="mt-3 max-w-lg border-rose-300/20 bg-rose-300/5 text-sm leading-6 text-rose-200/80">
-                {audioError}
-              </Alert>
-            )}
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl">
+        <header className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="h-8 gap-2">
+              <span
+                className={cn(
+                  'size-2 rounded-full',
+                  audioError
+                    ? 'bg-destructive'
+                    : audioState === 'ready'
+                      ? 'bg-emerald-500'
+                      : 'bg-primary',
+                )}
+              />
+              {audioStatus}
+            </Badge>
+            <Badge variant="secondary" className="h-8">
+              Arduino optional
+            </Badge>
           </div>
+        </header>
+        {audioError && (
+          <Alert variant="destructive" className="mt-4">
+            {audioError}
+          </Alert>
+        )}
 
-          <Card className="relative rounded-3xl border border-cyan-300/15 bg-[#0b1a22] p-6 text-slate-100 ring-0 shadow-2xl shadow-cyan-950/20">
+        <section className="grid gap-5 py-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <Card className="relative p-6">
             <div
               aria-hidden="true"
-              className="absolute -top-20 -right-14 size-48 rounded-full bg-cyan-300/10 blur-3xl"
+              className="absolute -top-20 -right-14 size-48 rounded-full bg-primary/10 blur-3xl"
             />
             <div className="relative">
-              <div className="flex items-center justify-between font-mono text-[0.65rem] tracking-[0.18em] text-slate-500 uppercase">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span className="flex items-center gap-2">
-                  <Volume2 className="size-3.5 text-cyan-300" />
-                  Output monitor
+                  <Volume2 className="size-4" />
+                  Output
                 </span>
-                <span className="text-cyan-300/70">Local</span>
+                <span>Local</span>
               </div>
               <div className="mt-10 flex items-end gap-1.5" aria-hidden="true">
                 {[28, 45, 34, 64, 42, 78, 52, 32, 58, 40, 70, 27].map(
                   (height, index) => (
                     <span
                       key={index}
-                      className="w-full rounded-full bg-cyan-300/60"
+                      className="w-full rounded-full bg-primary/60"
                       style={{ height: `${height}px` }}
                     />
                   ),
                 )}
               </div>
-              <div className="mt-8 flex items-end justify-between gap-4 border-t border-white/10 pt-4">
+              <div className="mt-8 flex items-end justify-between gap-4 border-t pt-4">
                 <div>
-                  <p className="font-mono text-[0.65rem] tracking-[0.16em] text-slate-500 uppercase">
-                    Last note
-                  </p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-100">
+                  <p className="text-xs text-muted-foreground">Last note</p>
+                  <p className="mt-1 text-2xl font-semibold">
                     {lastPlayed?.pitch ?? '--'}
                   </p>
                 </div>
                 <p
-                  className="max-w-28 text-right text-xs leading-5 text-slate-500"
+                  className="max-w-28 text-right text-xs leading-5 text-muted-foreground"
                   aria-live="polite"
                 >
                   {lastPlayed
@@ -527,26 +484,24 @@ function KeysWorkspace() {
               </div>
             </div>
           </Card>
+          <SerialConnection
+            onPrepareAudio={prepareAudio}
+            onSerialKey={handleSerialKey}
+          />
         </section>
 
         <Card
           role="region"
           aria-labelledby="instrument-heading"
-          className="gap-0 rounded-3xl border border-white/10 bg-[#0a151c]/90 py-0 text-slate-100 ring-0 shadow-2xl shadow-black/30"
+          className="gap-0 py-0"
         >
-          <CardHeader className="flex flex-wrap items-end justify-between gap-4 border-b border-white/10 px-5 py-5 sm:px-7">
+          <CardHeader className="flex flex-wrap items-end justify-between gap-4 border-b px-5 py-5 sm:px-6">
             <div>
-              <p className="font-mono text-[0.65rem] font-semibold tracking-[0.2em] text-slate-500 uppercase">
-                Instrument / 06 keys
-              </p>
-              <h2
-                id="instrument-heading"
-                className="mt-1 text-xl font-semibold text-slate-100 sm:text-2xl"
-              >
-                Pick your note
+              <h2 id="instrument-heading" className="text-base font-medium">
+                Instrument
               </h2>
             </div>
-            <p className="font-mono text-xs text-slate-500">
+            <p className="font-mono text-xs text-muted-foreground">
               Click, touch, or use A S D F G H
             </p>
           </CardHeader>
@@ -565,11 +520,11 @@ function KeysWorkspace() {
                   aria-label={`Play ${note.fruit}, ${note.pitch} note. Keyboard shortcut ${note.shortcut.toUpperCase()}.`}
                   aria-pressed={isActive}
                   className={cn(
-                    'group relative h-auto min-h-48 min-w-0 touch-manipulation flex-col items-stretch justify-between overflow-hidden rounded-2xl border p-4 text-left whitespace-normal transition duration-200 hover:text-slate-100 focus-visible:z-10 focus-visible:border-cyan-300 focus-visible:ring-4 focus-visible:ring-cyan-400/25 sm:min-h-52 sm:p-5',
+                    'group relative h-auto min-h-44 min-w-0 touch-manipulation flex-col items-stretch justify-between overflow-hidden border p-4 text-left whitespace-normal transition duration-200 focus-visible:z-10 sm:min-h-48',
                     note.accent,
                     isActive
-                      ? 'scale-[0.98] border-cyan-300/80 bg-cyan-300/15 shadow-[0_0_34px_rgba(34,211,238,0.2)]'
-                      : 'hover:-translate-y-1 hover:shadow-xl hover:shadow-black/20',
+                      ? 'scale-[0.98] border-primary bg-primary/15'
+                      : 'hover:-translate-y-0.5',
                   )}
                   onClick={() => playNote(note, `preview:${note.id}`, true)}
                   onPointerDown={(event) => {
@@ -600,26 +555,26 @@ function KeysWorkspace() {
                 >
                   <span
                     aria-hidden="true"
-                    className={`absolute -top-10 -right-8 size-28 rounded-full blur-2xl transition-opacity ${isActive ? 'bg-cyan-300/30 opacity-100' : 'bg-white/10 opacity-0 group-hover:opacity-100'}`}
+                    className={`absolute -top-10 -right-8 size-28 rounded-full bg-primary/20 blur-2xl transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}`}
                   />
                   <span className="relative flex items-start justify-between gap-2">
-                    <span className="grid size-11 place-items-center rounded-xl border border-white/10 bg-black/15 text-3xl shadow-inner shadow-white/10 transition-transform group-hover:scale-105">
+                    <span className="grid size-11 place-items-center rounded-lg border bg-background/60 text-3xl transition-transform group-hover:scale-105">
                       {note.emoji}
                     </span>
-                    <span className="rounded-md border border-white/10 bg-black/20 px-2 py-1 font-mono text-[0.65rem] font-semibold text-slate-400">
+                    <span className="rounded-md border bg-background/60 px-2 py-1 font-mono text-[0.65rem] font-semibold text-muted-foreground">
                       {note.shortcut.toUpperCase()}
                     </span>
                   </span>
                   <span className="relative mt-8">
-                    <span className="block text-lg font-medium text-slate-100">
+                    <span className="block text-lg font-medium text-foreground">
                       {note.fruit}
                     </span>
-                    <span className="mt-1 block font-mono text-[0.68rem] tracking-wide text-slate-500">
+                    <span className="mt-1 block font-mono text-[0.68rem] tracking-wide text-muted-foreground">
                       {note.pitch} / {note.frequency.toFixed(2)} Hz
                     </span>
                   </span>
                   <span
-                    className={`relative mt-4 font-mono text-[0.62rem] tracking-[0.12em] uppercase transition-colors ${isActive ? 'text-cyan-200' : 'text-slate-600 group-hover:text-slate-400'}`}
+                    className={`relative mt-4 font-mono text-[0.62rem] tracking-[0.12em] uppercase transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
                   >
                     {isActive ? 'Playing now' : 'Play note'}
                   </span>
@@ -628,56 +583,18 @@ function KeysWorkspace() {
             })}
           </CardContent>
 
-          <CardFooter className="flex-col items-start gap-3 border-white/10 bg-black/10 px-5 py-4 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+          <CardFooter className="flex-col items-start gap-3 px-5 py-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <span className="flex items-center gap-2">
-              <span className="size-1.5 rounded-full bg-cyan-300" />
+              <span className="size-1.5 rounded-full bg-primary" />
               Enter or Space also plays the focused key
             </span>
-            <span className="font-mono tracking-wide text-slate-600">
+            <span className="font-mono tracking-wide">
               Notes are generated in your browser
             </span>
           </CardFooter>
         </Card>
-
-        <section className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_25rem]">
-          <Card className="gap-0 rounded-2xl border border-white/10 bg-white/[0.035] p-5 text-slate-100 ring-0 sm:p-7">
-            <p className="font-mono text-[0.65rem] font-semibold tracking-[0.2em] text-cyan-400 uppercase">
-              How this preview works
-            </p>
-            <div className="mt-5 grid gap-5 sm:grid-cols-3">
-              <div>
-                <p className="font-mono text-xs text-slate-600">01 / input</p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
-                  Use a fruit circuit, pointer, touch screen, or shortcut key.
-                </p>
-              </div>
-              <div>
-                <p className="font-mono text-xs text-slate-600">02 / sound</p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
-                  Web Audio wakes up after your first gesture.
-                </p>
-              </div>
-              <div>
-                <p className="font-mono text-xs text-slate-600">03 / output</p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
-                  All active fruits can play browser-generated notes together.
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          <SerialConnection
-            onPrepareAudio={prepareAudio}
-            onSerialKey={handleSerialKey}
-          />
-        </section>
-
-        <footer className="flex flex-col gap-2 py-8 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-          <span>Arduino Keyboard / browser instrument</span>
-          <span>Audio stays local to this tab</span>
-        </footer>
       </div>
-    </main>
+    </div>
   )
 }
 
@@ -782,10 +699,10 @@ function SerialConnection({
 
   if (!isAvailableSerialApi) {
     return (
-      <Alert className="rounded-2xl border-amber-300/20 bg-amber-300/5 p-6 text-slate-100">
-        <PlugZap className="mb-3 size-6 text-amber-300" />
+      <Alert className="border-amber-500/30 bg-amber-500/10 p-6">
+        <PlugZap className="mb-3 size-6 text-amber-500" />
         <AlertTitle className="text-lg">Web Serial unavailable</AlertTitle>
-        <AlertDescription className="mt-2 leading-6 text-slate-400">
+        <AlertDescription className="mt-2 leading-6">
           Use desktop Chrome or Edge over HTTPS or localhost. Browser keys still
           work without a board.
         </AlertDescription>
@@ -794,30 +711,25 @@ function SerialConnection({
   }
 
   return (
-    <Card
-      role="complementary"
-      className="gap-0 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.035] p-5 text-slate-100 ring-0 sm:p-7"
-    >
+    <Card role="complementary" className="gap-0 p-5">
       <CardHeader className="flex-row items-start justify-between gap-4 px-0">
         <div>
-          <p className="font-mono text-[0.65rem] font-semibold tracking-[0.2em] text-cyan-400 uppercase">
-            Hardware / Web Serial
-          </p>
-          <h2 className="mt-2 text-xl font-semibold">
+          <p className="text-xs text-muted-foreground">Web Serial</p>
+          <h2 className="mt-1 text-base font-medium">
             {isConnected ? 'Arduino connected' : 'Connect your keyboard'}
           </h2>
         </div>
         <Badge
           variant="outline"
           className={cn(
-            'h-auto gap-2 border-white/10 bg-black/15 px-2.5 py-1.5 font-mono text-[0.62rem] uppercase',
-            isConnected ? 'text-emerald-300' : 'text-slate-500',
+            'h-auto gap-2 px-2.5 py-1.5 font-mono text-[0.62rem] uppercase',
+            isConnected ? 'text-emerald-500' : 'text-muted-foreground',
           )}
         >
           <span
             className={cn(
               'size-1.5 rounded-full',
-              isConnected ? 'bg-emerald-300' : 'bg-slate-600',
+              isConnected ? 'bg-emerald-500' : 'bg-muted-foreground/50',
             )}
           />
           {isConnected ? (isSubscribing ? 'Listening' : 'Opening') : 'Offline'}
@@ -825,18 +737,11 @@ function SerialConnection({
       </CardHeader>
 
       <CardContent className="px-0 pt-5">
-        <p className="text-sm leading-6 text-slate-400">
-          Flash the sketch in <code>ArduinoCode/</code>, then select the UNO at
-          9,600 baud. A0-A5 support six simultaneous fruit circuits.
-        </p>
-        <div className="mt-4 rounded-xl border border-white/10 bg-black/20 px-3 py-3">
-          <p className="font-mono text-[0.62rem] tracking-[0.14em] text-slate-600 uppercase">
+        <div className="rounded-lg border bg-muted/30 px-3 py-3">
+          <p className="font-mono text-[0.62rem] tracking-[0.14em] text-muted-foreground uppercase">
             Last serial event
           </p>
-          <p
-            className="mt-1 truncate font-mono text-xs text-cyan-200"
-            aria-live="polite"
-          >
+          <p className="mt-1 truncate font-mono text-xs" aria-live="polite">
             {lastEvent}
           </p>
         </div>
@@ -851,7 +756,7 @@ function SerialConnection({
           </Button>
         ) : (
           <Button
-            className="mt-5 h-10 w-full bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+            className="mt-5 h-10 w-full"
             disabled={isConnecting}
             onClick={() => {
               onPrepareAudio()
@@ -862,7 +767,7 @@ function SerialConnection({
           </Button>
         )}
 
-        <p className="mt-3 text-center font-mono text-[0.65rem] text-slate-600">
+        <p className="mt-3 text-center font-mono text-[0.65rem] text-muted-foreground">
           {isConnected
             ? `USB ${portInfo?.usbVendorId ?? '-'}:${portInfo?.usbProductId ?? '-'}`
             : 'Port selection requires a click'}
@@ -870,7 +775,7 @@ function SerialConnection({
       </CardContent>
 
       {(error || isUserCancelled) && (
-        <Alert className="mt-4 border-rose-300/20 bg-rose-300/5 text-xs text-rose-200">
+        <Alert variant="destructive" className="mt-4 text-xs">
           {error?.message ?? 'Port selection was cancelled.'}
         </Alert>
       )}
