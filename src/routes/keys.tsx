@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { Cable, PlugZap, Unplug, Volume2 } from 'lucide-react'
+import { Cable, PlugZap, Unplug, Volume2, Waves } from 'lucide-react'
 import {
   useEffect,
   useEffectEvent,
@@ -25,7 +25,7 @@ export const Route = createFileRoute('/keys')({
 const fruitNotes = [
   {
     id: 'apple',
-    fruit: 'Apple',
+    fruit: 'Key 1',
     emoji: '🍎',
     pitch: 'C4',
     frequency: 261.63,
@@ -35,7 +35,7 @@ const fruitNotes = [
   },
   {
     id: 'banana',
-    fruit: 'Banana',
+    fruit: 'Key 2',
     emoji: '🍌',
     pitch: 'D4',
     frequency: 293.66,
@@ -45,7 +45,7 @@ const fruitNotes = [
   },
   {
     id: 'orange',
-    fruit: 'Orange',
+    fruit: 'Key 3',
     emoji: '🍊',
     pitch: 'E4',
     frequency: 329.63,
@@ -55,7 +55,7 @@ const fruitNotes = [
   },
   {
     id: 'lemon',
-    fruit: 'Lemon',
+    fruit: 'Key 4',
     emoji: '🍋',
     pitch: 'F4',
     frequency: 349.23,
@@ -65,7 +65,7 @@ const fruitNotes = [
   },
   {
     id: 'watermelon',
-    fruit: 'Watermelon',
+    fruit: 'Key 5',
     emoji: '🍉',
     pitch: 'G4',
     frequency: 392,
@@ -75,7 +75,7 @@ const fruitNotes = [
   },
   {
     id: 'grapes',
-    fruit: 'Grapes',
+    fruit: 'Key 6',
     emoji: '🍇',
     pitch: 'A4',
     frequency: 440,
@@ -92,12 +92,15 @@ type SerialKeyAction = 'down' | 'up' | 'reset'
 type NoteVoice = {
   oscillator: OscillatorNode
   gain: GainNode
+  source?: string
+  releasing: boolean
   cleanup: () => void
 }
 
 type NotePlayer = {
   prepare: () => Promise<void>
-  play: (frequency: number) => Promise<void>
+  play: (frequency: number, source?: string) => Promise<void>
+  stop: (source: string) => void
   dispose: () => Promise<void>
 }
 
@@ -129,7 +132,7 @@ function createNotePlayer(): NotePlayer {
       if (isDisposed()) return
       if (context.state === 'suspended') await context.resume()
     },
-    async play(frequency) {
+    async play(frequency, source) {
       if (isDisposed()) return
 
       if (context.state === 'suspended') {
@@ -151,23 +154,48 @@ function createNotePlayer(): NotePlayer {
         gain.disconnect()
       }
 
-      voice = { oscillator, gain, cleanup }
+      if (source) {
+        for (const activeVoice of voices) {
+          if (activeVoice.source !== source) continue
+          try {
+            activeVoice.oscillator.stop()
+          } catch {
+            // The previous voice may have ended during a rapid re-press.
+          }
+          activeVoice.cleanup()
+        }
+      }
+
+      voice = { oscillator, gain, source, releasing: false, cleanup }
       voices.add(voice)
       oscillator.addEventListener('ended', cleanup)
       oscillator.type = 'triangle'
       oscillator.frequency.setValueAtTime(frequency, now)
       gain.gain.setValueAtTime(0.0001, now)
       gain.gain.exponentialRampToValueAtTime(0.16, now + 0.02)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.72)
+      if (!source) {
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.72)
+      }
       oscillator.connect(gain)
       gain.connect(context.destination)
 
       try {
         oscillator.start(now)
-        oscillator.stop(now + 0.76)
+        if (!source) oscillator.stop(now + 0.76)
       } catch (error) {
         cleanup()
         throw error
+      }
+    },
+    stop(source) {
+      const now = context.currentTime
+
+      for (const voice of voices) {
+        if (voice.source !== source || voice.releasing) continue
+        voice.releasing = true
+        voice.gain.gain.cancelScheduledValues(now)
+        voice.gain.gain.setTargetAtTime(0.0001, now, 0.015)
+        voice.oscillator.stop(now + 0.08)
       }
     },
     async dispose() {
@@ -232,8 +260,10 @@ function KeysWorkspace() {
   const [lastPlayed, setLastPlayed] = useState<FruitNote | null>(null)
   const [audioState, setAudioState] = useState<AudioState>('idle')
   const [audioError, setAudioError] = useState<string | null>(null)
+  const [sustainOnHold, setSustainOnHold] = useState(false)
   const audioPlayerRef = useRef<NotePlayer | null>(null)
   const releaseTimersRef = useRef<Map<string, number>>(new Map())
+  const sustainedSourcesRef = useRef<Set<string>>(new Set())
   const serialPressedRef = useRef<Set<string>>(new Set())
 
   function setSourceActive(source: string, active: boolean) {
@@ -284,13 +314,36 @@ function KeysWorkspace() {
     }
   }
 
-  function playNote(note: FruitNote, source: string, autoRelease = false) {
+  function releaseNote(source: string) {
+    sustainedSourcesRef.current.delete(source)
+    audioPlayerRef.current?.stop(source)
+    setSourceActive(source, false)
+  }
+
+  function stopSustainedNotes() {
+    const sources = new Set(sustainedSourcesRef.current)
+    for (const source of sources) audioPlayerRef.current?.stop(source)
+
+    setActiveSources(
+      (current) =>
+        new Set([...current].filter((source) => !sources.has(source))),
+    )
+    sustainedSourcesRef.current.clear()
+  }
+
+  function playNote(
+    note: FruitNote,
+    source: string,
+    autoRelease = false,
+    sustained = false,
+  ) {
     setSourceActive(source, true)
     setLastPlayed(note)
     setAudioError(null)
     setAudioState('starting')
 
     if (autoRelease) scheduleRelease(source)
+    if (sustained) sustainedSourcesRef.current.add(source)
 
     let player = audioPlayerRef.current
 
@@ -301,8 +354,11 @@ function KeysWorkspace() {
       }
 
       void player
-        .play(note.frequency)
+        .play(note.frequency, sustained ? source : undefined)
         .then(() => {
+          if (sustained && !sustainedSourcesRef.current.has(source)) {
+            player?.stop(source)
+          }
           setAudioState('ready')
         })
         .catch((error: unknown) => {
@@ -315,6 +371,9 @@ function KeysWorkspace() {
 
   function handleSerialKey(action: SerialKeyAction, noteId?: string) {
     if (action === 'reset') {
+      for (const source of sustainedSourcesRef.current) {
+        if (source.startsWith('serial:')) releaseNote(source)
+      }
       serialPressedRef.current.clear()
       setActiveSources(
         (current) =>
@@ -332,10 +391,10 @@ function KeysWorkspace() {
     if (action === 'down') {
       if (serialPressedRef.current.has(note.id)) return
       serialPressedRef.current.add(note.id)
-      playNote(note, source)
+      playNote(note, source, false, sustainOnHold)
     } else {
       serialPressedRef.current.delete(note.id)
-      setSourceActive(source, false)
+      releaseNote(source)
     }
   }
 
@@ -366,17 +425,20 @@ function KeysWorkspace() {
     if (!note) return
 
     event.preventDefault()
-    playNote(note, `shortcut:${note.id}`)
+    playNote(note, `shortcut:${note.id}`, false, sustainOnHold)
   })
 
   const handleShortcutKeyUp = useEffectEvent((event: KeyboardEvent) => {
     const note = fruitNotes.find(
       (candidate) => candidate.shortcut === event.key.toLowerCase(),
     )
-    if (note) setSourceActive(`shortcut:${note.id}`, false)
+    if (note) releaseNote(`shortcut:${note.id}`)
   })
 
   const clearBrowserKeys = useEffectEvent(() => {
+    for (const source of sustainedSourcesRef.current) {
+      if (!source.startsWith('serial:')) releaseNote(source)
+    }
     setActiveSources(
       (current) =>
         new Set([...current].filter((source) => source.startsWith('serial:'))),
@@ -501,9 +563,24 @@ function KeysWorkspace() {
                 Instrument
               </h2>
             </div>
-            <p className="font-mono text-xs text-muted-foreground">
-              Click, touch, or use A S D F G H
-            </p>
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <p className="font-mono text-xs text-muted-foreground">
+                Click, touch, or use A S D F G H
+              </p>
+              <Button
+                type="button"
+                variant={sustainOnHold ? 'default' : 'outline'}
+                size="sm"
+                aria-pressed={sustainOnHold}
+                onClick={() => {
+                  if (sustainOnHold) stopSustainedNotes()
+                  setSustainOnHold((enabled) => !enabled)
+                }}
+              >
+                <Waves />
+                Hold to sustain
+              </Button>
+            </div>
           </CardHeader>
 
           <CardContent className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 sm:gap-4 sm:p-6 lg:grid-cols-6">
@@ -517,7 +594,7 @@ function KeysWorkspace() {
                   key={note.id}
                   variant="outline"
                   type="button"
-                  aria-label={`Play ${note.fruit}, ${note.pitch} note. Keyboard shortcut ${note.shortcut.toUpperCase()}.`}
+                  aria-label={`Play ${note.fruit}, ${note.pitch} note. Keyboard shortcut ${note.shortcut.toUpperCase()}.${sustainOnHold ? ' Hold to sustain.' : ''}`}
                   aria-pressed={isActive}
                   className={cn(
                     'group relative h-auto min-h-44 min-w-0 touch-manipulation flex-col items-stretch justify-between overflow-hidden border p-4 text-left whitespace-normal transition duration-200 focus-visible:z-10 sm:min-h-48',
@@ -526,30 +603,44 @@ function KeysWorkspace() {
                       ? 'scale-[0.98] border-primary bg-primary/15'
                       : 'hover:-translate-y-0.5',
                   )}
-                  onClick={() => playNote(note, `preview:${note.id}`, true)}
-                  onPointerDown={(event) => {
-                    if (event.button === 0) {
-                      setSourceActive(`pointer:${note.id}`, true)
+                  onClick={() => {
+                    if (!sustainOnHold) {
+                      playNote(note, `preview:${note.id}`, true)
                     }
                   }}
-                  onPointerUp={() =>
-                    setSourceActive(`pointer:${note.id}`, false)
-                  }
-                  onPointerCancel={() =>
-                    setSourceActive(`pointer:${note.id}`, false)
-                  }
-                  onPointerLeave={() =>
-                    setSourceActive(`pointer:${note.id}`, false)
-                  }
-                  onBlur={() => setSourceActive(`pointer:${note.id}`, false)}
+                  onPointerDown={(event) => {
+                    if (event.button === 0) {
+                      const source = `pointer:${note.id}`
+                      if (sustainOnHold) {
+                        playNote(note, source, false, true)
+                      } else {
+                        setSourceActive(source, true)
+                      }
+                    }
+                  }}
+                  onPointerUp={() => releaseNote(`pointer:${note.id}`)}
+                  onPointerCancel={() => releaseNote(`pointer:${note.id}`)}
+                  onPointerLeave={() => releaseNote(`pointer:${note.id}`)}
+                  onBlur={() => {
+                    releaseNote(`pointer:${note.id}`)
+                    releaseNote(`button:${note.id}`)
+                  }}
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      setSourceActive(`button:${note.id}`, true)
+                    if (
+                      (event.key === 'Enter' || event.key === ' ') &&
+                      !event.repeat
+                    ) {
+                      const source = `button:${note.id}`
+                      if (sustainOnHold) {
+                        playNote(note, source, false, true)
+                      } else {
+                        setSourceActive(source, true)
+                      }
                     }
                   }}
                   onKeyUp={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
-                      setSourceActive(`button:${note.id}`, false)
+                      releaseNote(`button:${note.id}`)
                     }
                   }}
                 >
