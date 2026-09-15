@@ -13,6 +13,8 @@ import { Alert, AlertDescription, AlertTitle } from '#/components/ui/alert'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader } from '#/components/ui/card'
+import type { NoteNotation } from '#/lib/note-notation'
+import { formatNote } from '#/lib/note-notation'
 import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/keys')({
@@ -261,6 +263,7 @@ function KeysWorkspace() {
   const [audioState, setAudioState] = useState<AudioState>('idle')
   const [audioError, setAudioError] = useState<string | null>(null)
   const [sustainOnHold, setSustainOnHold] = useState(false)
+  const [noteNotation, setNoteNotation] = useState<NoteNotation>('letter')
   const audioPlayerRef = useRef<NotePlayer | null>(null)
   const releaseTimersRef = useRef<Map<string, number>>(new Map())
   const sustainedSourcesRef = useRef<Set<string>>(new Set())
@@ -532,7 +535,9 @@ function KeysWorkspace() {
                 <div>
                   <p className="text-xs text-muted-foreground">Last note</p>
                   <p className="mt-1 text-2xl font-semibold">
-                    {lastPlayed?.pitch ?? '--'}
+                    {lastPlayed
+                      ? formatNote(lastPlayed.pitch, noteNotation)
+                      : '--'}
                   </p>
                 </div>
                 <p
@@ -567,6 +572,32 @@ function KeysWorkspace() {
               <p className="font-mono text-xs text-muted-foreground">
                 Click, touch, or use A S D F G H
               </p>
+              <div
+                role="group"
+                aria-label="Note naming system"
+                className="flex rounded-md border bg-muted/30 p-0.5"
+              >
+                <Button
+                  type="button"
+                  variant={noteNotation === 'letter' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2.5 font-mono text-xs"
+                  aria-pressed={noteNotation === 'letter'}
+                  onClick={() => setNoteNotation('letter')}
+                >
+                  C D E
+                </Button>
+                <Button
+                  type="button"
+                  variant={noteNotation === 'solfege' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2.5 text-xs"
+                  aria-pressed={noteNotation === 'solfege'}
+                  onClick={() => setNoteNotation('solfege')}
+                >
+                  Dó Ré Mi
+                </Button>
+              </div>
               <Button
                 type="button"
                 variant={sustainOnHold ? 'default' : 'outline'}
@@ -594,7 +625,7 @@ function KeysWorkspace() {
                   key={note.id}
                   variant="outline"
                   type="button"
-                  aria-label={`Play ${note.fruit}, ${note.pitch} note. Keyboard shortcut ${note.shortcut.toUpperCase()}.${sustainOnHold ? ' Hold to sustain.' : ''}`}
+                  aria-label={`Play ${note.fruit}, ${formatNote(note.pitch, noteNotation)} note. Keyboard shortcut ${note.shortcut.toUpperCase()}.${sustainOnHold ? ' Hold to sustain.' : ''}`}
                   aria-pressed={isActive}
                   className={cn(
                     'group relative h-auto min-h-44 min-w-0 touch-manipulation flex-col items-stretch justify-between overflow-hidden border p-4 text-left whitespace-normal transition duration-200 focus-visible:z-10 sm:min-h-48',
@@ -661,7 +692,8 @@ function KeysWorkspace() {
                       {note.fruit}
                     </span>
                     <span className="mt-1 block font-mono text-[0.68rem] tracking-wide text-muted-foreground">
-                      {note.pitch} / {note.frequency.toFixed(2)} Hz
+                      {formatNote(note.pitch, noteNotation)} /{' '}
+                      {note.frequency.toFixed(2)} Hz
                     </span>
                   </span>
                   <span
