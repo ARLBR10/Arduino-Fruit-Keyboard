@@ -4,7 +4,7 @@
 
 const unsigned long SERIAL_BAUD = 9600;
 const unsigned long DEBOUNCE_MS = 30;
-const int TOUCH_THRESHOLD = 800;
+const int TOUCH_THRESHOLD = 1000;
 
 const byte KEY_COUNT = 6;
 const byte keyPins[KEY_COUNT] = {A0, A1, A2, A3, A4, A5};
