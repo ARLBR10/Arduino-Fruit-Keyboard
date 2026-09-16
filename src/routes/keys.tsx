@@ -1,5 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { Cable, PlugZap, Unplug, Volume2, Waves } from 'lucide-react'
+import {
+  Cable,
+  FileAudio,
+  Loader2,
+  PlugZap,
+  Trash2,
+  Unplug,
+  Upload,
+  Volume2,
+  Waves,
+} from 'lucide-react'
 import {
   useEffect,
   useEffectEvent,
@@ -7,12 +17,20 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
+import type { ChangeEvent } from 'react'
 import { SerialProvider, useSerialPort } from 'react-web-serial'
 
 import { Alert, AlertDescription, AlertTitle } from '#/components/ui/alert'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader } from '#/components/ui/card'
+import { Input } from '#/components/ui/input'
+import { Label } from '#/components/ui/label'
+import { NativeSelect, NativeSelectOption } from '#/components/ui/native-select'
+import type { AudioConfig, FruitKeyId, KeyMapping } from '#/lib/audio-clips'
+import { createDefaultAudioConfig } from '#/lib/audio-clips'
+import type { FruitAudioPlayer } from '#/lib/browser-audio'
+import { createFruitAudioPlayer } from '#/lib/browser-audio'
 import type { NoteNotation } from '#/lib/note-notation'
 import { formatNote } from '#/lib/note-notation'
 import { cn } from '#/lib/utils'
@@ -91,145 +109,43 @@ type FruitNote = (typeof fruitNotes)[number]
 type AudioState = 'idle' | 'starting' | 'ready' | 'error'
 type SerialKeyAction = 'down' | 'up' | 'reset'
 
-type NoteVoice = {
-  oscillator: OscillatorNode
-  gain: GainNode
-  source?: string
-  releasing: boolean
-  cleanup: () => void
-}
-
-type NotePlayer = {
-  prepare: () => Promise<void>
-  play: (frequency: number, source?: string) => Promise<void>
-  stop: (source: string) => void
-  dispose: () => Promise<void>
-}
-
-type BrowserAudioWindow = {
-  AudioContext?: typeof AudioContext
-  webkitAudioContext?: typeof AudioContext
-}
-
-function createNotePlayer(): NotePlayer {
-  if (typeof window === 'undefined') {
-    throw new Error('Browser audio is not available during server rendering.')
-  }
-
-  const browserWindow = window as unknown as BrowserAudioWindow
-  const AudioContextConstructor =
-    browserWindow.AudioContext ?? browserWindow.webkitAudioContext
-
-  if (!AudioContextConstructor) {
-    throw new Error('This browser does not support Web Audio preview.')
-  }
-
-  const context = new AudioContextConstructor()
-  const voices = new Set<NoteVoice>()
-  let disposed = false
-  const isDisposed = () => disposed
-
-  return {
-    async prepare() {
-      if (isDisposed()) return
-      if (context.state === 'suspended') await context.resume()
-    },
-    async play(frequency, source) {
-      if (isDisposed()) return
-
-      if (context.state === 'suspended') {
-        await context.resume()
-      }
-
-      if (isDisposed()) return
-
-      const now = context.currentTime
-      const oscillator = context.createOscillator()
-      const gain = context.createGain()
-      let voice: NoteVoice | null = null
-
-      const cleanup = () => {
-        if (voice === null || !voices.delete(voice)) return
-
-        oscillator.removeEventListener('ended', cleanup)
-        oscillator.disconnect()
-        gain.disconnect()
-      }
-
-      if (source) {
-        for (const activeVoice of voices) {
-          if (activeVoice.source !== source) continue
-          try {
-            activeVoice.oscillator.stop()
-          } catch {
-            // The previous voice may have ended during a rapid re-press.
-          }
-          activeVoice.cleanup()
-        }
-      }
-
-      voice = { oscillator, gain, source, releasing: false, cleanup }
-      voices.add(voice)
-      oscillator.addEventListener('ended', cleanup)
-      oscillator.type = 'triangle'
-      oscillator.frequency.setValueAtTime(frequency, now)
-      gain.gain.setValueAtTime(0.0001, now)
-      gain.gain.exponentialRampToValueAtTime(0.16, now + 0.02)
-      if (!source) {
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.72)
-      }
-      oscillator.connect(gain)
-      gain.connect(context.destination)
-
-      try {
-        oscillator.start(now)
-        if (!source) oscillator.stop(now + 0.76)
-      } catch (error) {
-        cleanup()
-        throw error
-      }
-    },
-    stop(source) {
-      const now = context.currentTime
-
-      for (const voice of voices) {
-        if (voice.source !== source || voice.releasing) continue
-        voice.releasing = true
-        voice.gain.gain.cancelScheduledValues(now)
-        voice.gain.gain.setTargetAtTime(0.0001, now, 0.015)
-        voice.oscillator.stop(now + 0.08)
-      }
-    },
-    async dispose() {
-      if (disposed) return
-      disposed = true
-
-      for (const voice of voices) {
-        try {
-          voice.oscillator.stop()
-        } catch {
-          // A voice may finish between iteration and cleanup.
-        }
-        voice.cleanup()
-      }
-      voices.clear()
-
-      if (context.state !== 'closed') {
-        await context.close().catch(() => undefined)
-      }
-    },
-  }
-}
-
 function audioErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message.includes('Web Audio')) {
-    return error.message
-  }
+  if (error instanceof Error) return error.message
 
   return 'Audio could not start. Try a key again or check browser permissions.'
 }
 
 const emptySubscribe = () => () => undefined
+
+async function responseError(response: Response) {
+  const body = (await response.json().catch(() => null)) as {
+    error?: string
+  } | null
+  return body?.error ?? `Request failed (${response.status}).`
+}
+
+function readAudioDuration(file: File) {
+  return new Promise<number>((resolve, reject) => {
+    const audio = document.createElement('audio')
+    const url = URL.createObjectURL(file)
+    const cleanup = () => {
+      audio.removeAttribute('src')
+      URL.revokeObjectURL(url)
+    }
+    audio.preload = 'metadata'
+    audio.onloadedmetadata = () => {
+      const duration = audio.duration
+      cleanup()
+      if (Number.isFinite(duration) && duration > 0) resolve(duration)
+      else reject(new Error('The audio duration could not be read.'))
+    }
+    audio.onerror = () => {
+      cleanup()
+      reject(new Error('The selected file is not playable audio.'))
+    }
+    audio.src = url
+  })
+}
 
 function Keys() {
   const isClient = useSyncExternalStore(
@@ -264,10 +180,102 @@ function KeysWorkspace() {
   const [audioError, setAudioError] = useState<string | null>(null)
   const [sustainOnHold, setSustainOnHold] = useState(false)
   const [noteNotation, setNoteNotation] = useState<NoteNotation>('letter')
-  const audioPlayerRef = useRef<NotePlayer | null>(null)
+  const [audioConfig, setAudioConfig] = useState<AudioConfig>(() =>
+    createDefaultAudioConfig(),
+  )
+  const [configStatus, setConfigStatus] = useState<
+    'loading' | 'saved' | 'dirty' | 'saving' | 'error'
+  >('loading')
+  const [configError, setConfigError] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const audioPlayerRef = useRef<FruitAudioPlayer | null>(null)
   const releaseTimersRef = useRef<Map<string, number>>(new Map())
   const sustainedSourcesRef = useRef<Set<string>>(new Set())
   const serialPressedRef = useRef<Set<string>>(new Set())
+
+  function updateMapping(keyId: FruitKeyId, mapping: KeyMapping) {
+    setAudioConfig((current) => ({
+      ...current,
+      mappings: { ...current.mappings, [keyId]: mapping },
+    }))
+    setConfigStatus('dirty')
+    setConfigError(null)
+  }
+
+  async function saveConfiguration() {
+    setConfigStatus('saving')
+    setConfigError(null)
+    try {
+      const response = await fetch('/api/audio-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseRevision: audioConfig.revision,
+          sustainOnHold,
+          mappings: audioConfig.mappings,
+        }),
+      })
+      if (!response.ok) throw new Error(await responseError(response))
+      const saved = (await response.json()) as AudioConfig
+      setAudioConfig(saved)
+      setSustainOnHold(saved.sustainOnHold)
+      setConfigStatus('saved')
+    } catch (error) {
+      setConfigStatus('error')
+      setConfigError(audioErrorMessage(error))
+    }
+  }
+
+  async function uploadClip(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    setUploading(true)
+    setConfigError(null)
+    try {
+      const durationSec = await readAudioDuration(file)
+      const form = new FormData()
+      form.set('file', file)
+      form.set('durationSec', String(durationSec))
+      form.set('baseRevision', String(audioConfig.revision))
+      const response = await fetch('/api/audio-clips', {
+        method: 'POST',
+        body: form,
+      })
+      if (!response.ok) throw new Error(await responseError(response))
+      const result = (await response.json()) as { config: AudioConfig }
+      setAudioConfig(result.config)
+      setConfigStatus('saved')
+    } catch (error) {
+      setConfigStatus('error')
+      setConfigError(audioErrorMessage(error))
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function deleteClip(clipId: string) {
+    setUploading(true)
+    setConfigError(null)
+    try {
+      const params = new URLSearchParams({
+        id: clipId,
+        baseRevision: String(audioConfig.revision),
+      })
+      const response = await fetch(`/api/audio-clip?${params}`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) throw new Error(await responseError(response))
+      setAudioConfig((await response.json()) as AudioConfig)
+      setConfigStatus('saved')
+    } catch (error) {
+      setConfigStatus('error')
+      setConfigError(audioErrorMessage(error))
+    } finally {
+      setUploading(false)
+    }
+  }
 
   function setSourceActive(source: string, active: boolean) {
     setActiveSources((current) => {
@@ -290,7 +298,7 @@ function KeysWorkspace() {
     releaseTimersRef.current.set(source, timer)
   }
 
-  function handleAudioError(player: NotePlayer | null, error: unknown) {
+  function handleAudioError(player: FruitAudioPlayer | null, error: unknown) {
     if (audioPlayerRef.current === player) audioPlayerRef.current = null
     setAudioState('error')
     setAudioError(audioErrorMessage(error))
@@ -304,7 +312,7 @@ function KeysWorkspace() {
     let player = audioPlayerRef.current
     try {
       if (player === null) {
-        player = createNotePlayer()
+        player = createFruitAudioPlayer()
         audioPlayerRef.current = player
       }
 
@@ -334,7 +342,7 @@ function KeysWorkspace() {
     sustainedSourcesRef.current.clear()
   }
 
-  function playNote(
+  function playKey(
     note: FruitNote,
     source: string,
     autoRelease = false,
@@ -352,12 +360,23 @@ function KeysWorkspace() {
 
     try {
       if (player === null) {
-        player = createNotePlayer()
+        player = createFruitAudioPlayer()
         audioPlayerRef.current = player
       }
 
-      void player
-        .play(note.frequency, sustained ? source : undefined)
+      const mapping = audioConfig.mappings[note.id]
+      const clip =
+        mapping.kind === 'clip'
+          ? audioConfig.clips.find(
+              (candidate) => candidate.id === mapping.clipId,
+            )
+          : undefined
+      const playback =
+        mapping.kind === 'clip' && clip
+          ? player.playClip(clip, mapping, sustained ? source : undefined)
+          : player.playNote(note.frequency, sustained ? source : undefined)
+
+      void playback
         .then(() => {
           if (sustained && !sustainedSourcesRef.current.has(source)) {
             player?.stop(source)
@@ -394,7 +413,7 @@ function KeysWorkspace() {
     if (action === 'down') {
       if (serialPressedRef.current.has(note.id)) return
       serialPressedRef.current.add(note.id)
-      playNote(note, source, false, sustainOnHold)
+      playKey(note, source, false, sustainOnHold)
     } else {
       serialPressedRef.current.delete(note.id)
       releaseNote(source)
@@ -428,7 +447,7 @@ function KeysWorkspace() {
     if (!note) return
 
     event.preventDefault()
-    playNote(note, `shortcut:${note.id}`, false, sustainOnHold)
+    playKey(note, `shortcut:${note.id}`, false, sustainOnHold)
   })
 
   const handleShortcutKeyUp = useEffectEvent((event: KeyboardEvent) => {
@@ -447,6 +466,27 @@ function KeysWorkspace() {
         new Set([...current].filter((source) => source.startsWith('serial:'))),
     )
   })
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void fetch('/api/audio-config', { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await responseError(response))
+        return response.json() as Promise<AudioConfig>
+      })
+      .then((config) => {
+        setAudioConfig(config)
+        setSustainOnHold(config.sustainOnHold)
+        setConfigStatus('saved')
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        setConfigStatus('error')
+        setConfigError(audioErrorMessage(error))
+      })
+
+    return () => controller.abort()
+  }, [])
 
   useEffect(() => {
     window.addEventListener('keydown', handleShortcutKeyDown)
@@ -603,9 +643,15 @@ function KeysWorkspace() {
                 variant={sustainOnHold ? 'default' : 'outline'}
                 size="sm"
                 aria-pressed={sustainOnHold}
+                disabled={
+                  configStatus === 'loading' ||
+                  configStatus === 'saving' ||
+                  uploading
+                }
                 onClick={() => {
                   if (sustainOnHold) stopSustainedNotes()
                   setSustainOnHold((enabled) => !enabled)
+                  setConfigStatus('dirty')
                 }}
               >
                 <Waves />
@@ -619,13 +665,20 @@ function KeysWorkspace() {
               const isActive = [...activeSources].some((source) =>
                 source.endsWith(`:${note.id}`),
               )
+              const mapping = audioConfig.mappings[note.id]
+              const assignedClip =
+                mapping.kind === 'clip'
+                  ? audioConfig.clips.find(
+                      (candidate) => candidate.id === mapping.clipId,
+                    )
+                  : undefined
 
               return (
                 <Button
                   key={note.id}
                   variant="outline"
                   type="button"
-                  aria-label={`Play ${note.fruit}, ${formatNote(note.pitch, noteNotation)} note. Keyboard shortcut ${note.shortcut.toUpperCase()}.${sustainOnHold ? ' Hold to sustain.' : ''}`}
+                  aria-label={`Play ${note.fruit}, ${assignedClip ? `audio clip ${assignedClip.originalName}` : `${formatNote(note.pitch, noteNotation)} note`}. Keyboard shortcut ${note.shortcut.toUpperCase()}.${sustainOnHold ? ' Hold to sustain.' : ''}`}
                   aria-pressed={isActive}
                   className={cn(
                     'group relative h-auto min-h-44 min-w-0 touch-manipulation flex-col items-stretch justify-between overflow-hidden border p-4 text-left whitespace-normal transition duration-200 focus-visible:z-10 sm:min-h-48',
@@ -636,14 +689,14 @@ function KeysWorkspace() {
                   )}
                   onClick={() => {
                     if (!sustainOnHold) {
-                      playNote(note, `preview:${note.id}`, true)
+                      playKey(note, `preview:${note.id}`, true)
                     }
                   }}
                   onPointerDown={(event) => {
                     if (event.button === 0) {
                       const source = `pointer:${note.id}`
                       if (sustainOnHold) {
-                        playNote(note, source, false, true)
+                        playKey(note, source, false, true)
                       } else {
                         setSourceActive(source, true)
                       }
@@ -663,7 +716,7 @@ function KeysWorkspace() {
                     ) {
                       const source = `button:${note.id}`
                       if (sustainOnHold) {
-                        playNote(note, source, false, true)
+                        playKey(note, source, false, true)
                       } else {
                         setSourceActive(source, true)
                       }
@@ -691,15 +744,20 @@ function KeysWorkspace() {
                     <span className="block text-lg font-medium text-foreground">
                       {note.fruit}
                     </span>
-                    <span className="mt-1 block font-mono text-[0.68rem] tracking-wide text-muted-foreground">
-                      {formatNote(note.pitch, noteNotation)} /{' '}
-                      {note.frequency.toFixed(2)} Hz
+                    <span className="mt-1 block truncate font-mono text-[0.68rem] tracking-wide text-muted-foreground">
+                      {assignedClip && mapping.kind === 'clip'
+                        ? `${assignedClip.originalName} · ${mapping.startSec.toFixed(1)}–${mapping.endSec.toFixed(1)}s`
+                        : `${formatNote(note.pitch, noteNotation)} / ${note.frequency.toFixed(2)} Hz`}
                     </span>
                   </span>
                   <span
                     className={`relative mt-4 font-mono text-[0.62rem] tracking-[0.12em] uppercase transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
                   >
-                    {isActive ? 'Playing now' : 'Play note'}
+                    {isActive
+                      ? 'Playing now'
+                      : assignedClip
+                        ? 'Play clip'
+                        : 'Play note'}
                   </span>
                 </Button>
               )
@@ -712,9 +770,277 @@ function KeysWorkspace() {
               Enter or Space also plays the focused key
             </span>
             <span className="font-mono tracking-wide">
-              Notes are generated in your browser
+              Notes and uploaded clips play in your browser
             </span>
           </CardFooter>
+        </Card>
+
+        <Card
+          className="mt-6 gap-0 py-0"
+          aria-labelledby="audio-library-heading"
+        >
+          <CardHeader className="flex flex-wrap items-center justify-between gap-4 border-b px-5 py-5 sm:px-6">
+            <div>
+              <h2 id="audio-library-heading" className="text-base font-medium">
+                Audio clips
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Files and key assignments are stored on the server for every
+                browser.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-xs text-muted-foreground">
+                {configStatus === 'loading'
+                  ? 'Loading…'
+                  : configStatus === 'saving'
+                    ? 'Saving…'
+                    : configStatus === 'dirty'
+                      ? 'Unsaved changes'
+                      : configStatus === 'error'
+                        ? 'Save failed'
+                        : 'Saved on server'}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                disabled={
+                  configStatus === 'loading' ||
+                  configStatus === 'saving' ||
+                  configStatus === 'saved'
+                }
+                onClick={() => void saveConfiguration()}
+              >
+                {configStatus === 'saving' && (
+                  <Loader2 className="animate-spin" />
+                )}
+                Save assignments
+              </Button>
+              <Label
+                className={cn(
+                  'inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-md border bg-background px-2.5 text-[0.8rem] font-medium hover:bg-muted',
+                  (uploading || configStatus !== 'saved') &&
+                    'pointer-events-none opacity-50',
+                )}
+              >
+                {uploading ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Upload className="size-3.5" />
+                )}
+                {uploading ? 'Uploading…' : 'Upload audio'}
+                <Input
+                  className="sr-only"
+                  type="file"
+                  accept="audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm,audio/x-m4a,audio/x-wav"
+                  disabled={uploading || configStatus !== 'saved'}
+                  onChange={(event) => void uploadClip(event)}
+                />
+              </Label>
+            </div>
+          </CardHeader>
+
+          {configError && (
+            <Alert variant="destructive" className="m-5 mb-0 sm:m-6 sm:mb-0">
+              {configError}
+            </Alert>
+          )}
+
+          <CardContent className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">Key assignments</h3>
+              {fruitNotes.map((note) => {
+                const mapping = audioConfig.mappings[note.id]
+                const clip =
+                  mapping.kind === 'clip'
+                    ? audioConfig.clips.find(
+                        (candidate) => candidate.id === mapping.clipId,
+                      )
+                    : undefined
+
+                return (
+                  <div
+                    key={note.id}
+                    className="grid gap-3 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[7rem_minmax(0,1fr)_8rem_8rem] sm:items-end"
+                  >
+                    <div className="flex items-center gap-2 pb-1">
+                      <span className="text-xl" aria-hidden="true">
+                        {note.emoji}
+                      </span>
+                      <span className="text-sm font-medium">{note.fruit}</span>
+                    </div>
+                    <div>
+                      <Label htmlFor={`sound-${note.id}`} className="text-xs">
+                        Sound
+                      </Label>
+                      <NativeSelect
+                        id={`sound-${note.id}`}
+                        className="mt-1 w-full [&_select]:h-9"
+                        value={
+                          mapping.kind === 'clip' ? mapping.clipId : 'note'
+                        }
+                        disabled={
+                          configStatus === 'loading' ||
+                          configStatus === 'saving' ||
+                          uploading
+                        }
+                        onChange={(event) => {
+                          const selected = audioConfig.clips.find(
+                            (candidate) => candidate.id === event.target.value,
+                          )
+                          updateMapping(
+                            note.id,
+                            selected
+                              ? {
+                                  kind: 'clip',
+                                  clipId: selected.id,
+                                  startSec: 0,
+                                  endSec: Math.min(selected.durationSec, 5),
+                                }
+                              : { kind: 'note' },
+                          )
+                        }}
+                      >
+                        <NativeSelectOption value="note">
+                          Generated {formatNote(note.pitch, noteNotation)} note
+                        </NativeSelectOption>
+                        {audioConfig.clips.map((candidate) => (
+                          <NativeSelectOption
+                            key={candidate.id}
+                            value={candidate.id}
+                          >
+                            {candidate.originalName}
+                          </NativeSelectOption>
+                        ))}
+                      </NativeSelect>
+                    </div>
+                    <div>
+                      <Label htmlFor={`start-${note.id}`} className="text-xs">
+                        Start (seconds)
+                      </Label>
+                      <Input
+                        id={`start-${note.id}`}
+                        className="mt-1 h-9"
+                        type="number"
+                        min={0}
+                        max={
+                          mapping.kind === 'clip'
+                            ? Math.max(0, mapping.endSec - 0.05)
+                            : undefined
+                        }
+                        step={0.05}
+                        disabled={
+                          mapping.kind !== 'clip' ||
+                          configStatus === 'loading' ||
+                          configStatus === 'saving' ||
+                          uploading
+                        }
+                        value={mapping.kind === 'clip' ? mapping.startSec : ''}
+                        onChange={(event) => {
+                          if (mapping.kind !== 'clip') return
+                          updateMapping(note.id, {
+                            ...mapping,
+                            startSec: Math.max(0, Number(event.target.value)),
+                          })
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`end-${note.id}`} className="text-xs">
+                        End (seconds)
+                      </Label>
+                      <Input
+                        id={`end-${note.id}`}
+                        className="mt-1 h-9"
+                        type="number"
+                        min={
+                          mapping.kind === 'clip' ? mapping.startSec + 0.05 : 0
+                        }
+                        max={clip?.durationSec}
+                        step={0.05}
+                        disabled={
+                          mapping.kind !== 'clip' ||
+                          configStatus === 'loading' ||
+                          configStatus === 'saving' ||
+                          uploading
+                        }
+                        value={mapping.kind === 'clip' ? mapping.endSec : ''}
+                        onChange={(event) => {
+                          if (mapping.kind !== 'clip') return
+                          updateMapping(note.id, {
+                            ...mapping,
+                            endSec: Number(event.target.value),
+                          })
+                        }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Server library</h3>
+                <Badge variant="secondary">
+                  {audioConfig.clips.length} clips
+                </Badge>
+              </div>
+              {audioConfig.clips.length === 0 ? (
+                <div className="grid min-h-40 place-items-center rounded-lg border border-dashed text-center text-sm text-muted-foreground">
+                  <div>
+                    <FileAudio className="mx-auto mb-2 size-6" />
+                    Upload an audio file to assign it to a key.
+                  </div>
+                </div>
+              ) : (
+                audioConfig.clips.map((clip) => {
+                  const isAssigned = Object.values(audioConfig.mappings).some(
+                    (mapping) =>
+                      mapping.kind === 'clip' && mapping.clipId === clip.id,
+                  )
+                  return (
+                    <div key={clip.id} className="rounded-lg border p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {clip.originalName}
+                          </p>
+                          <p className="mt-1 font-mono text-[0.65rem] text-muted-foreground">
+                            {clip.durationSec.toFixed(2)}s ·{' '}
+                            {(clip.sizeBytes / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="icon-sm"
+                          variant="ghost"
+                          disabled={
+                            isAssigned || configStatus !== 'saved' || uploading
+                          }
+                          aria-label={`Delete ${clip.originalName}`}
+                          title={
+                            isAssigned
+                              ? 'Unassign this clip before deleting it.'
+                              : 'Delete clip'
+                          }
+                          onClick={() => void deleteClip(clip.id)}
+                        >
+                          <Trash2 />
+                        </Button>
+                      </div>
+                      <audio
+                        className="mt-3 h-8 w-full"
+                        controls
+                        preload="metadata"
+                        src={clip.url}
+                      />
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </CardContent>
         </Card>
       </div>
     </div>

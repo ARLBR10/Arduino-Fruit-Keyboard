@@ -17,6 +17,21 @@ To build this application for production:
 bun --bun run build
 ```
 
+## Uploaded audio storage
+
+Fruit Keys stores uploaded clips and key assignments in the Cloudflare R2 bucket
+bound as `FRUIT_AUDIO_BUCKET`. Create the bucket before deploying:
+
+```bash
+bun x wrangler r2 bucket create fruit-keyboard-audio
+```
+
+The library is intentionally shared by every browser using this single keyboard
+installation. The app does not include user accounts, so deployments exposed to
+the public internet should protect write access with Cloudflare Access or an
+equivalent authentication layer. Uploads are limited to 10 MB per file and 24
+clips, and the server verifies supported file signatures before storing them.
+
 ## Styling
 
 This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
@@ -32,7 +47,6 @@ If you prefer not to use Tailwind CSS:
 
 ## Linting & Formatting
 
-
 This project uses [eslint](https://eslint.org/) and [prettier](https://prettier.io/) for linting and formatting. Eslint is configured using [tanstack/eslint-config](https://tanstack.com/config/latest/docs/eslint). The following scripts are available:
 
 ```bash
@@ -40,7 +54,6 @@ bun --bun run lint
 bun --bun run format
 bun --bun run check
 ```
-
 
 ## Deploy with Nitro
 
@@ -54,8 +67,6 @@ node dist/server/index.mjs
 The build output is a self-contained Node server. To deploy, push the `dist/` directory to your host (Render, Fly.io, your own VPS, etc.) and run the server command above.
 
 For host-specific presets (Vercel, Netlify, Cloudflare, AWS Lambda, etc.) and tuning, see https://v3.nitro.build/deploy.
-
-
 
 ## Routing
 
@@ -74,7 +85,7 @@ Now that you have two routes you can use a `Link` component to navigate between 
 To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
 
 ```tsx
-import { Link } from "@tanstack/react-router";
+import { Link } from '@tanstack/react-router'
 ```
 
 Then anywhere in your JSX you can use it like so:
@@ -142,11 +153,11 @@ const getServerTime = createServerFn({
 // Use in a component
 function MyComponent() {
   const [time, setTime] = useState('')
-  
+
   useEffect(() => {
     getServerTime().then(setTime)
   }, [])
-  
+
   return <div>Server time: {time}</div>
 }
 ```
@@ -198,8 +209,6 @@ function PeopleComponent() {
 ```
 
 Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-
 
 # Learn More
 
