@@ -1,5 +1,6 @@
-import { defineConfig } from "nitro";
+import { defineConfig } from 'nitro'
 
 export default defineConfig({
-	preset: "cloudflare_module"
+  preset: 'cloudflare_module',
+  scanDirs: ['.'],
 })
