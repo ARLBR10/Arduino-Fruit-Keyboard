@@ -19,18 +19,13 @@ bun --bun run build
 
 ## Uploaded audio storage
 
-Fruit Keys stores uploaded clips and key assignments in the Cloudflare R2 bucket
-bound as `FRUIT_AUDIO_BUCKET`. Create the bucket before deploying:
+Fruit Keys stores uploaded clips and key assignments locally in the browser using
+IndexedDB. Clips are restored as browser object URLs when the keys page loads, so
+the native preview controls and assigned key sounds work without a backend.
 
-```bash
-bun x wrangler r2 bucket create fruit-keyboard-audio
-```
-
-The library is intentionally shared by every browser using this single keyboard
-installation. The app does not include user accounts, so deployments exposed to
-the public internet should protect write access with Cloudflare Access or an
-equivalent authentication layer. Uploads are limited to 10 MB per file and 24
-clips, and the server verifies supported file signatures before storing them.
+The library is local to the browser and device where the files were uploaded. It
+is limited to 10 MB per file and 24 clips; supported file signatures are checked
+before a clip is stored.
 
 ## Styling
 

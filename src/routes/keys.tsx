@@ -232,6 +232,8 @@ function KeysWorkspace() {
       const durationSec = await readAudioDuration(file)
       const next = await addBrowserAudioClip(audioConfig, file, durationSec)
       setAudioConfig(next)
+      setUseAudioClips(true)
+      setAudioClipsExpanded(true)
       setConfigStatus('saved')
     } catch (error) {
       setConfigStatus('error')
@@ -833,7 +835,7 @@ function KeysWorkspace() {
                   disabled={
                     configStatus === 'loading' ||
                     configStatus === 'saving' ||
-                    configStatus === 'saved'
+                    uploading
                   }
                   onClick={() => void saveConfiguration()}
                 >
@@ -845,7 +847,9 @@ function KeysWorkspace() {
                 <Label
                   className={cn(
                     'inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-md border bg-background px-2.5 text-[0.8rem] font-medium hover:bg-muted',
-                    (uploading || configStatus !== 'saved') &&
+                    (uploading ||
+                      configStatus === 'loading' ||
+                      configStatus === 'saving') &&
                       'pointer-events-none opacity-50',
                   )}
                 >
@@ -859,7 +863,11 @@ function KeysWorkspace() {
                     className="sr-only"
                     type="file"
                     accept="audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm,audio/x-m4a,audio/x-wav"
-                    disabled={uploading || configStatus !== 'saved'}
+                    disabled={
+                      uploading ||
+                      configStatus === 'loading' ||
+                      configStatus === 'saving'
+                    }
                     onChange={(event) => void uploadClip(event)}
                   />
                 </Label>
