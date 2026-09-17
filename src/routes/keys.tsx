@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import {
   Cable,
+  ChevronDown,
   FileAudio,
   Loader2,
   PlugZap,
@@ -180,6 +181,8 @@ function KeysWorkspace() {
   const [audioError, setAudioError] = useState<string | null>(null)
   const [sustainOnHold, setSustainOnHold] = useState(false)
   const [noteNotation, setNoteNotation] = useState<NoteNotation>('letter')
+  const [useAudioClips, setUseAudioClips] = useState(false)
+  const [audioClipsExpanded, setAudioClipsExpanded] = useState(false)
   const [audioConfig, setAudioConfig] = useState<AudioConfig>(() =>
     createDefaultAudioConfig(),
   )
@@ -348,7 +351,7 @@ function KeysWorkspace() {
             )
           : undefined
       const playback =
-        mapping.kind === 'clip' && clip
+        useAudioClips && mapping.kind === 'clip' && clip
           ? player.playClip(clip, mapping, sustained ? source : undefined)
           : player.playNote(note.frequency, sustained ? source : undefined)
 
@@ -495,6 +498,15 @@ function KeysWorkspace() {
       : audioState === 'starting'
         ? 'Starting audio'
         : 'Waiting for a key'
+  const lastPlayedMapping = lastPlayed
+    ? audioConfig.mappings[lastPlayed.id]
+    : undefined
+  const lastPlayedClip =
+    useAudioClips && lastPlayedMapping?.kind === 'clip'
+      ? audioConfig.clips.find(
+          (candidate) => candidate.id === lastPlayedMapping.clipId,
+        )
+      : undefined
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -552,11 +564,12 @@ function KeysWorkspace() {
               </div>
               <div className="mt-8 flex items-end justify-between gap-4 border-t pt-4">
                 <div>
-                  <p className="text-xs text-muted-foreground">Last note</p>
+                  <p className="text-xs text-muted-foreground">Last sound</p>
                   <p className="mt-1 text-2xl font-semibold">
-                    {lastPlayed
-                      ? formatNote(lastPlayed.pitch, noteNotation)
-                      : '--'}
+                    {lastPlayedClip?.originalName ??
+                      (lastPlayed
+                        ? formatNote(lastPlayed.pitch, noteNotation)
+                        : '--')}
                   </p>
                 </div>
                 <p
@@ -564,7 +577,7 @@ function KeysWorkspace() {
                   aria-live="polite"
                 >
                   {lastPlayed
-                    ? `${lastPlayed.fruit} tone playing locally`
+                    ? `${lastPlayed.fruit} ${lastPlayedClip ? 'audio clip' : 'tone'} playing locally`
                     : 'Play any key to begin'}
                 </p>
               </div>
@@ -593,28 +606,57 @@ function KeysWorkspace() {
               </p>
               <div
                 role="group"
-                aria-label="Note naming system"
+                aria-label="Sound set"
                 className="flex rounded-md border bg-muted/30 p-0.5"
               >
                 <Button
                   type="button"
-                  variant={noteNotation === 'letter' ? 'secondary' : 'ghost'}
+                  variant={
+                    !useAudioClips && noteNotation === 'letter'
+                      ? 'secondary'
+                      : 'ghost'
+                  }
                   size="sm"
                   className="h-7 px-2.5 font-mono text-xs"
-                  aria-pressed={noteNotation === 'letter'}
-                  onClick={() => setNoteNotation('letter')}
+                  aria-pressed={!useAudioClips && noteNotation === 'letter'}
+                  onClick={() => {
+                    setNoteNotation('letter')
+                    setUseAudioClips(false)
+                    setAudioClipsExpanded(false)
+                  }}
                 >
                   C D E
                 </Button>
                 <Button
                   type="button"
-                  variant={noteNotation === 'solfege' ? 'secondary' : 'ghost'}
+                  variant={
+                    !useAudioClips && noteNotation === 'solfege'
+                      ? 'secondary'
+                      : 'ghost'
+                  }
                   size="sm"
                   className="h-7 px-2.5 text-xs"
-                  aria-pressed={noteNotation === 'solfege'}
-                  onClick={() => setNoteNotation('solfege')}
+                  aria-pressed={!useAudioClips && noteNotation === 'solfege'}
+                  onClick={() => {
+                    setNoteNotation('solfege')
+                    setUseAudioClips(false)
+                    setAudioClipsExpanded(false)
+                  }}
                 >
                   Dó Ré Mi
+                </Button>
+                <Button
+                  type="button"
+                  variant={useAudioClips ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2.5 text-xs"
+                  aria-pressed={useAudioClips}
+                  onClick={() => {
+                    setUseAudioClips(true)
+                    setAudioClipsExpanded(true)
+                  }}
+                >
+                  Audios
                 </Button>
               </div>
               <Button
@@ -657,7 +699,7 @@ function KeysWorkspace() {
                   key={note.id}
                   variant="outline"
                   type="button"
-                  aria-label={`Play ${note.fruit}, ${assignedClip ? `audio clip ${assignedClip.originalName}` : `${formatNote(note.pitch, noteNotation)} note`}. Keyboard shortcut ${note.shortcut.toUpperCase()}.${sustainOnHold ? ' Hold to sustain.' : ''}`}
+                  aria-label={`Play ${note.fruit}, ${useAudioClips && assignedClip ? `audio clip ${assignedClip.originalName}` : `${formatNote(note.pitch, noteNotation)} note`}. Keyboard shortcut ${note.shortcut.toUpperCase()}.${sustainOnHold ? ' Hold to sustain.' : ''}`}
                   aria-pressed={isActive}
                   className={cn(
                     'group relative h-auto min-h-44 min-w-0 touch-manipulation flex-col items-stretch justify-between overflow-hidden border p-4 text-left whitespace-normal transition duration-200 focus-visible:z-10 sm:min-h-48',
@@ -724,7 +766,7 @@ function KeysWorkspace() {
                       {note.fruit}
                     </span>
                     <span className="mt-1 block truncate font-mono text-[0.68rem] tracking-wide text-muted-foreground">
-                      {assignedClip && mapping.kind === 'clip'
+                      {useAudioClips && assignedClip && mapping.kind === 'clip'
                         ? `${assignedClip.originalName} · ${mapping.startSec.toFixed(1)}–${mapping.endSec.toFixed(1)}s`
                         : `${formatNote(note.pitch, noteNotation)} / ${note.frequency.toFixed(2)} Hz`}
                     </span>
@@ -734,7 +776,7 @@ function KeysWorkspace() {
                   >
                     {isActive
                       ? 'Playing now'
-                      : assignedClip
+                      : useAudioClips && assignedClip
                         ? 'Play clip'
                         : 'Play note'}
                   </span>
@@ -758,7 +800,12 @@ function KeysWorkspace() {
           className="mt-6 gap-0 py-0"
           aria-labelledby="audio-library-heading"
         >
-          <CardHeader className="flex flex-wrap items-center justify-between gap-4 border-b px-5 py-5 sm:px-6">
+          <CardHeader
+            className={cn(
+              'flex flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-6',
+              audioClipsExpanded && 'border-b',
+            )}
+          >
             <div>
               <h2 id="audio-library-heading" className="text-base font-medium">
                 Audio clips
@@ -767,258 +814,318 @@ function KeysWorkspace() {
                 Files and key assignments are stored only in this browser.
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="font-mono text-xs text-muted-foreground">
-                {configStatus === 'loading'
-                  ? 'Loading…'
-                  : configStatus === 'saving'
-                    ? 'Saving…'
-                    : configStatus === 'dirty'
-                      ? 'Unsaved changes'
-                      : configStatus === 'error'
-                        ? 'Save failed'
-                        : 'Saved in browser'}
-              </span>
+            {audioClipsExpanded ? (
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-xs text-muted-foreground">
+                  {configStatus === 'loading'
+                    ? 'Loading…'
+                    : configStatus === 'saving'
+                      ? 'Saving…'
+                      : configStatus === 'dirty'
+                        ? 'Unsaved changes'
+                        : configStatus === 'error'
+                          ? 'Save failed'
+                          : 'Saved in browser'}
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={
+                    configStatus === 'loading' ||
+                    configStatus === 'saving' ||
+                    configStatus === 'saved'
+                  }
+                  onClick={() => void saveConfiguration()}
+                >
+                  {configStatus === 'saving' && (
+                    <Loader2 className="animate-spin" />
+                  )}
+                  Save assignments
+                </Button>
+                <Label
+                  className={cn(
+                    'inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-md border bg-background px-2.5 text-[0.8rem] font-medium hover:bg-muted',
+                    (uploading || configStatus !== 'saved') &&
+                      'pointer-events-none opacity-50',
+                  )}
+                >
+                  {uploading ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="size-3.5" />
+                  )}
+                  {uploading ? 'Uploading…' : 'Upload audio'}
+                  <Input
+                    className="sr-only"
+                    type="file"
+                    accept="audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm,audio/x-m4a,audio/x-wav"
+                    disabled={uploading || configStatus !== 'saved'}
+                    onChange={(event) => void uploadClip(event)}
+                  />
+                </Label>
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="Collapse audio clips"
+                  aria-expanded={true}
+                  aria-controls="audio-clips-panel"
+                  onClick={() => setAudioClipsExpanded(false)}
+                >
+                  <ChevronDown className="rotate-180" />
+                </Button>
+              </div>
+            ) : (
               <Button
                 type="button"
                 size="sm"
-                disabled={
-                  configStatus === 'loading' ||
-                  configStatus === 'saving' ||
-                  configStatus === 'saved'
-                }
-                onClick={() => void saveConfiguration()}
+                variant="outline"
+                aria-expanded={false}
+                aria-controls="audio-clips-panel"
+                onClick={() => {
+                  setUseAudioClips(true)
+                  setAudioClipsExpanded(true)
+                }}
               >
-                {configStatus === 'saving' && (
-                  <Loader2 className="animate-spin" />
-                )}
-                Save assignments
+                <ChevronDown /> Expand audio clips
               </Button>
-              <Label
-                className={cn(
-                  'inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-md border bg-background px-2.5 text-[0.8rem] font-medium hover:bg-muted',
-                  (uploading || configStatus !== 'saved') &&
-                    'pointer-events-none opacity-50',
-                )}
-              >
-                {uploading ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Upload className="size-3.5" />
-                )}
-                {uploading ? 'Uploading…' : 'Upload audio'}
-                <Input
-                  className="sr-only"
-                  type="file"
-                  accept="audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm,audio/x-m4a,audio/x-wav"
-                  disabled={uploading || configStatus !== 'saved'}
-                  onChange={(event) => void uploadClip(event)}
-                />
-              </Label>
-            </div>
+            )}
           </CardHeader>
 
-          {configError && (
-            <Alert variant="destructive" className="m-5 mb-0 sm:m-6 sm:mb-0">
-              {configError}
-            </Alert>
-          )}
-
-          <CardContent className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium">Key assignments</h3>
-              {fruitNotes.map((note) => {
-                const mapping = audioConfig.mappings[note.id]
-                const clip =
-                  mapping.kind === 'clip'
-                    ? audioConfig.clips.find(
-                        (candidate) => candidate.id === mapping.clipId,
-                      )
-                    : undefined
-
-                return (
-                  <div
-                    key={note.id}
-                    className="grid gap-3 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[7rem_minmax(0,1fr)_8rem_8rem] sm:items-end"
-                  >
-                    <div className="flex items-center gap-2 pb-1">
-                      <span className="text-xl" aria-hidden="true">
-                        {note.emoji}
-                      </span>
-                      <span className="text-sm font-medium">{note.fruit}</span>
-                    </div>
-                    <div>
-                      <Label htmlFor={`sound-${note.id}`} className="text-xs">
-                        Sound
-                      </Label>
-                      <NativeSelect
-                        id={`sound-${note.id}`}
-                        className="mt-1 w-full [&_select]:h-9"
-                        value={
-                          mapping.kind === 'clip' ? mapping.clipId : 'note'
-                        }
-                        disabled={
-                          configStatus === 'loading' ||
-                          configStatus === 'saving' ||
-                          uploading
-                        }
-                        onChange={(event) => {
-                          const selected = audioConfig.clips.find(
-                            (candidate) => candidate.id === event.target.value,
-                          )
-                          updateMapping(
-                            note.id,
-                            selected
-                              ? {
-                                  kind: 'clip',
-                                  clipId: selected.id,
-                                  startSec: 0,
-                                  endSec: Math.min(selected.durationSec, 5),
-                                }
-                              : { kind: 'note' },
-                          )
-                        }}
-                      >
-                        <NativeSelectOption value="note">
-                          Generated {formatNote(note.pitch, noteNotation)} note
-                        </NativeSelectOption>
-                        {audioConfig.clips.map((candidate) => (
-                          <NativeSelectOption
-                            key={candidate.id}
-                            value={candidate.id}
-                          >
-                            {candidate.originalName}
-                          </NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                    </div>
-                    <div>
-                      <Label htmlFor={`start-${note.id}`} className="text-xs">
-                        Start (seconds)
-                      </Label>
-                      <Input
-                        id={`start-${note.id}`}
-                        className="mt-1 h-9"
-                        type="number"
-                        min={0}
-                        max={
-                          mapping.kind === 'clip'
-                            ? Math.max(0, mapping.endSec - 0.05)
-                            : undefined
-                        }
-                        step={0.05}
-                        disabled={
-                          mapping.kind !== 'clip' ||
-                          configStatus === 'loading' ||
-                          configStatus === 'saving' ||
-                          uploading
-                        }
-                        value={mapping.kind === 'clip' ? mapping.startSec : ''}
-                        onChange={(event) => {
-                          if (mapping.kind !== 'clip') return
-                          updateMapping(note.id, {
-                            ...mapping,
-                            startSec: Math.max(0, Number(event.target.value)),
-                          })
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor={`end-${note.id}`} className="text-xs">
-                        End (seconds)
-                      </Label>
-                      <Input
-                        id={`end-${note.id}`}
-                        className="mt-1 h-9"
-                        type="number"
-                        min={
-                          mapping.kind === 'clip' ? mapping.startSec + 0.05 : 0
-                        }
-                        max={clip?.durationSec}
-                        step={0.05}
-                        disabled={
-                          mapping.kind !== 'clip' ||
-                          configStatus === 'loading' ||
-                          configStatus === 'saving' ||
-                          uploading
-                        }
-                        value={mapping.kind === 'clip' ? mapping.endSec : ''}
-                        onChange={(event) => {
-                          if (mapping.kind !== 'clip') return
-                          updateMapping(note.id, {
-                            ...mapping,
-                            endSec: Number(event.target.value),
-                          })
-                        }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">Browser library</h3>
-                <Badge variant="secondary">
-                  {audioConfig.clips.length} clips
-                </Badge>
-              </div>
-              {audioConfig.clips.length === 0 ? (
-                <div className="grid min-h-40 place-items-center rounded-lg border border-dashed text-center text-sm text-muted-foreground">
-                  <div>
-                    <FileAudio className="mx-auto mb-2 size-6" />
-                    Upload an audio file to assign it to a key.
-                  </div>
-                </div>
-              ) : (
-                audioConfig.clips.map((clip) => {
-                  const isAssigned = Object.values(audioConfig.mappings).some(
-                    (mapping) =>
-                      mapping.kind === 'clip' && mapping.clipId === clip.id,
-                  )
-                  return (
-                    <div key={clip.id} className="rounded-lg border p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">
-                            {clip.originalName}
-                          </p>
-                          <p className="mt-1 font-mono text-[0.65rem] text-muted-foreground">
-                            {clip.durationSec.toFixed(2)}s ·{' '}
-                            {(clip.sizeBytes / 1024 / 1024).toFixed(2)} MB
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          disabled={
-                            isAssigned || configStatus !== 'saved' || uploading
-                          }
-                          aria-label={`Delete ${clip.originalName}`}
-                          title={
-                            isAssigned
-                              ? 'Unassign this clip before deleting it.'
-                              : 'Delete clip'
-                          }
-                          onClick={() => void deleteClip(clip.id)}
-                        >
-                          <Trash2 />
-                        </Button>
-                      </div>
-                      <audio
-                        className="mt-3 h-8 w-full"
-                        controls
-                        preload="metadata"
-                        src={clip.url}
-                      />
-                    </div>
-                  )
-                })
+          {audioClipsExpanded && (
+            <>
+              {configError && (
+                <Alert
+                  variant="destructive"
+                  className="m-5 mb-0 sm:m-6 sm:mb-0"
+                >
+                  {configError}
+                </Alert>
               )}
-            </div>
-          </CardContent>
+
+              <CardContent
+                id="audio-clips-panel"
+                className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]"
+              >
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium">Key assignments</h3>
+                  {fruitNotes.map((note) => {
+                    const mapping = audioConfig.mappings[note.id]
+                    const clip =
+                      mapping.kind === 'clip'
+                        ? audioConfig.clips.find(
+                            (candidate) => candidate.id === mapping.clipId,
+                          )
+                        : undefined
+
+                    return (
+                      <div
+                        key={note.id}
+                        className="grid gap-3 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[7rem_minmax(0,1fr)_8rem_8rem] sm:items-end"
+                      >
+                        <div className="flex items-center gap-2 pb-1">
+                          <span className="text-xl" aria-hidden="true">
+                            {note.emoji}
+                          </span>
+                          <span className="text-sm font-medium">
+                            {note.fruit}
+                          </span>
+                        </div>
+                        <div>
+                          <Label
+                            htmlFor={`sound-${note.id}`}
+                            className="text-xs"
+                          >
+                            Sound
+                          </Label>
+                          <NativeSelect
+                            id={`sound-${note.id}`}
+                            className="mt-1 w-full [&_select]:h-9"
+                            value={
+                              mapping.kind === 'clip' ? mapping.clipId : 'note'
+                            }
+                            disabled={
+                              configStatus === 'loading' ||
+                              configStatus === 'saving' ||
+                              uploading
+                            }
+                            onChange={(event) => {
+                              const selected = audioConfig.clips.find(
+                                (candidate) =>
+                                  candidate.id === event.target.value,
+                              )
+                              updateMapping(
+                                note.id,
+                                selected
+                                  ? {
+                                      kind: 'clip',
+                                      clipId: selected.id,
+                                      startSec: 0,
+                                      endSec: Math.min(selected.durationSec, 5),
+                                    }
+                                  : { kind: 'note' },
+                              )
+                            }}
+                          >
+                            <NativeSelectOption value="note">
+                              Generated {formatNote(note.pitch, noteNotation)}{' '}
+                              note
+                            </NativeSelectOption>
+                            {audioConfig.clips.map((candidate) => (
+                              <NativeSelectOption
+                                key={candidate.id}
+                                value={candidate.id}
+                              >
+                                {candidate.originalName}
+                              </NativeSelectOption>
+                            ))}
+                          </NativeSelect>
+                        </div>
+                        <div>
+                          <Label
+                            htmlFor={`start-${note.id}`}
+                            className="text-xs"
+                          >
+                            Start (seconds)
+                          </Label>
+                          <Input
+                            id={`start-${note.id}`}
+                            className="mt-1 h-9"
+                            type="number"
+                            min={0}
+                            max={
+                              mapping.kind === 'clip'
+                                ? Math.max(0, mapping.endSec - 0.05)
+                                : undefined
+                            }
+                            step={0.05}
+                            disabled={
+                              mapping.kind !== 'clip' ||
+                              configStatus === 'loading' ||
+                              configStatus === 'saving' ||
+                              uploading
+                            }
+                            value={
+                              mapping.kind === 'clip' ? mapping.startSec : ''
+                            }
+                            onChange={(event) => {
+                              if (mapping.kind !== 'clip') return
+                              updateMapping(note.id, {
+                                ...mapping,
+                                startSec: Math.max(
+                                  0,
+                                  Number(event.target.value),
+                                ),
+                              })
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`end-${note.id}`} className="text-xs">
+                            End (seconds)
+                          </Label>
+                          <Input
+                            id={`end-${note.id}`}
+                            className="mt-1 h-9"
+                            type="number"
+                            min={
+                              mapping.kind === 'clip'
+                                ? mapping.startSec + 0.05
+                                : 0
+                            }
+                            max={clip?.durationSec}
+                            step={0.05}
+                            disabled={
+                              mapping.kind !== 'clip' ||
+                              configStatus === 'loading' ||
+                              configStatus === 'saving' ||
+                              uploading
+                            }
+                            value={
+                              mapping.kind === 'clip' ? mapping.endSec : ''
+                            }
+                            onChange={(event) => {
+                              if (mapping.kind !== 'clip') return
+                              updateMapping(note.id, {
+                                ...mapping,
+                                endSec: Number(event.target.value),
+                              })
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium">Browser library</h3>
+                    <Badge variant="secondary">
+                      {audioConfig.clips.length} clips
+                    </Badge>
+                  </div>
+                  {audioConfig.clips.length === 0 ? (
+                    <div className="grid min-h-40 place-items-center rounded-lg border border-dashed text-center text-sm text-muted-foreground">
+                      <div>
+                        <FileAudio className="mx-auto mb-2 size-6" />
+                        Upload an audio file to assign it to a key.
+                      </div>
+                    </div>
+                  ) : (
+                    audioConfig.clips.map((clip) => {
+                      const isAssigned = Object.values(
+                        audioConfig.mappings,
+                      ).some(
+                        (mapping) =>
+                          mapping.kind === 'clip' && mapping.clipId === clip.id,
+                      )
+                      return (
+                        <div key={clip.id} className="rounded-lg border p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">
+                                {clip.originalName}
+                              </p>
+                              <p className="mt-1 font-mono text-[0.65rem] text-muted-foreground">
+                                {clip.durationSec.toFixed(2)}s ·{' '}
+                                {(clip.sizeBytes / 1024 / 1024).toFixed(2)} MB
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              size="icon-sm"
+                              variant="ghost"
+                              disabled={
+                                isAssigned ||
+                                configStatus !== 'saved' ||
+                                uploading
+                              }
+                              aria-label={`Delete ${clip.originalName}`}
+                              title={
+                                isAssigned
+                                  ? 'Unassign this clip before deleting it.'
+                                  : 'Delete clip'
+                              }
+                              onClick={() => void deleteClip(clip.id)}
+                            >
+                              <Trash2 />
+                            </Button>
+                          </div>
+                          <audio
+                            className="mt-3 h-8 w-full"
+                            controls
+                            preload="metadata"
+                            src={clip.url}
+                          />
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </CardContent>
+            </>
+          )}
         </Card>
       </div>
     </div>
