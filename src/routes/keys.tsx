@@ -31,6 +31,13 @@ import type { AudioConfig, FruitKeyId, KeyMapping } from '#/lib/audio-clips'
 import { createDefaultAudioConfig } from '#/lib/audio-clips'
 import type { FruitAudioPlayer } from '#/lib/browser-audio'
 import { createFruitAudioPlayer } from '#/lib/browser-audio'
+import {
+  addBrowserAudioClip,
+  deleteBrowserAudioClip,
+  loadBrowserAudioConfig,
+  revokeAudioConfigUrls,
+  saveBrowserAudioConfig,
+} from '#/lib/browser-audio-storage'
 import type { NoteNotation } from '#/lib/note-notation'
 import { formatNote } from '#/lib/note-notation'
 import { cn } from '#/lib/utils'
@@ -117,13 +124,6 @@ function audioErrorMessage(error: unknown) {
 
 const emptySubscribe = () => () => undefined
 
-async function responseError(response: Response) {
-  const body = (await response.json().catch(() => null)) as {
-    error?: string
-  } | null
-  return body?.error ?? `Request failed (${response.status}).`
-}
-
 function readAudioDuration(file: File) {
   return new Promise<number>((resolve, reject) => {
     const audio = document.createElement('audio')
@@ -189,9 +189,11 @@ function KeysWorkspace() {
   const [configError, setConfigError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const audioPlayerRef = useRef<FruitAudioPlayer | null>(null)
+  const audioConfigRef = useRef(audioConfig)
   const releaseTimersRef = useRef<Map<string, number>>(new Map())
   const sustainedSourcesRef = useRef<Set<string>>(new Set())
   const serialPressedRef = useRef<Set<string>>(new Set())
+  audioConfigRef.current = audioConfig
 
   function updateMapping(keyId: FruitKeyId, mapping: KeyMapping) {
     setAudioConfig((current) => ({
@@ -206,17 +208,7 @@ function KeysWorkspace() {
     setConfigStatus('saving')
     setConfigError(null)
     try {
-      const response = await fetch('/api/audio-config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          baseRevision: audioConfig.revision,
-          sustainOnHold,
-          mappings: audioConfig.mappings,
-        }),
-      })
-      if (!response.ok) throw new Error(await responseError(response))
-      const saved = (await response.json()) as AudioConfig
+      const saved = await saveBrowserAudioConfig(audioConfig, sustainOnHold)
       setAudioConfig(saved)
       setSustainOnHold(saved.sustainOnHold)
       setConfigStatus('saved')
@@ -235,17 +227,8 @@ function KeysWorkspace() {
     setConfigError(null)
     try {
       const durationSec = await readAudioDuration(file)
-      const form = new FormData()
-      form.set('file', file)
-      form.set('durationSec', String(durationSec))
-      form.set('baseRevision', String(audioConfig.revision))
-      const response = await fetch('/api/audio-clips', {
-        method: 'POST',
-        body: form,
-      })
-      if (!response.ok) throw new Error(await responseError(response))
-      const result = (await response.json()) as { config: AudioConfig }
-      setAudioConfig(result.config)
+      const next = await addBrowserAudioClip(audioConfig, file, durationSec)
+      setAudioConfig(next)
       setConfigStatus('saved')
     } catch (error) {
       setConfigStatus('error')
@@ -259,15 +242,8 @@ function KeysWorkspace() {
     setUploading(true)
     setConfigError(null)
     try {
-      const params = new URLSearchParams({
-        id: clipId,
-        baseRevision: String(audioConfig.revision),
-      })
-      const response = await fetch(`/api/audio-clip?${params}`, {
-        method: 'DELETE',
-      })
-      if (!response.ok) throw new Error(await responseError(response))
-      setAudioConfig((await response.json()) as AudioConfig)
+      const next = await deleteBrowserAudioClip(audioConfig, clipId)
+      setAudioConfig(next)
       setConfigStatus('saved')
     } catch (error) {
       setConfigStatus('error')
@@ -468,24 +444,26 @@ function KeysWorkspace() {
   })
 
   useEffect(() => {
-    const controller = new AbortController()
-    void fetch('/api/audio-config', { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(await responseError(response))
-        return response.json() as Promise<AudioConfig>
-      })
+    let cancelled = false
+    void loadBrowserAudioConfig()
       .then((config) => {
+        if (cancelled) {
+          revokeAudioConfigUrls(config)
+          return
+        }
         setAudioConfig(config)
         setSustainOnHold(config.sustainOnHold)
         setConfigStatus('saved')
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted) return
+        if (cancelled) return
         setConfigStatus('error')
         setConfigError(audioErrorMessage(error))
       })
 
-    return () => controller.abort()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -506,6 +484,7 @@ function KeysWorkspace() {
       const player = audioPlayerRef.current
       audioPlayerRef.current = null
       if (player) void player.dispose()
+      revokeAudioConfigUrls(audioConfigRef.current)
     }
   }, [])
 
@@ -785,8 +764,7 @@ function KeysWorkspace() {
                 Audio clips
               </h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Files and key assignments are stored on the server for every
-                browser.
+                Files and key assignments are stored only in this browser.
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -799,7 +777,7 @@ function KeysWorkspace() {
                       ? 'Unsaved changes'
                       : configStatus === 'error'
                         ? 'Save failed'
-                        : 'Saved on server'}
+                        : 'Saved in browser'}
               </span>
               <Button
                 type="button"
@@ -981,7 +959,7 @@ function KeysWorkspace() {
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">Server library</h3>
+                <h3 className="text-sm font-medium">Browser library</h3>
                 <Badge variant="secondary">
                   {audioConfig.clips.length} clips
                 </Badge>

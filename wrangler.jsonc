@@ -2,10 +2,4 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "fruit-keyboard",
   "compatibility_date": "2026-09-16",
-  "r2_buckets": [
-    {
-      "binding": "FRUIT_AUDIO_BUCKET",
-      "bucket_name": "fruit-keyboard-audio",
-    },
-  ],
 }
