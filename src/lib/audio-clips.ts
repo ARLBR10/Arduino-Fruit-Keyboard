@@ -5,6 +5,12 @@ export const fruitKeyIds = [
   'lemon',
   'watermelon',
   'grapes',
+  'strawberry',
+  'pineapple',
+  'cherry',
+  'pear',
+  'peach',
+  'kiwi',
 ] as const
 
 export type FruitKeyId = (typeof fruitKeyIds)[number]
