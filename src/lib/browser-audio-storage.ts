@@ -131,7 +131,10 @@ export async function loadBrowserAudioConfig(): Promise<AudioConfig> {
         : []
     })
     const availableClipIds = new Set(clips.map((clip) => clip.id))
-    const mappings = { ...config.mappings }
+    const mappings = {
+      ...createDefaultAudioConfig().mappings,
+      ...config.mappings,
+    }
     for (const keyId of fruitKeyIds) {
       const mapping = mappings[keyId]
       if (mapping.kind === 'clip' && !availableClipIds.has(mapping.clipId)) {

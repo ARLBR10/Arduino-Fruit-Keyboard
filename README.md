@@ -27,6 +27,14 @@ The library is local to the browser and device where the files were uploaded. It
 is limited to 10 MB per file and 24 clips; supported file signatures are checked
 before a clip is stored.
 
+## Two-board keyboard
+
+The `/keys` page provides twelve browser-playable keys and two independent Web
+Serial connections. Flash `ArduinoCode/ArduinoCode.ino` onto both Arduino Unos,
+then select Arduino 1 for keys 1-6 and Arduino 2 for keys 7-12. The same serial
+event names are mapped according to the connection slot, so both boards use the
+same sketch.
+
 ## Styling
 
 This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.

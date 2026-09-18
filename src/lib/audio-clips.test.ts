@@ -23,6 +23,12 @@ test('default audio config maps every fruit key to its generated note', () => {
     'lemon',
     'watermelon',
     'grapes',
+    'strawberry',
+    'pineapple',
+    'cherry',
+    'pear',
+    'peach',
+    'kiwi',
   ])
   assert.equal(config.mappings.apple.kind, 'note')
 })

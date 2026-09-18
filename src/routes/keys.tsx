@@ -111,11 +111,75 @@ const fruitNotes = [
     accent:
       'border-violet-300/20 bg-violet-300/[0.06] hover:border-violet-200/50 hover:bg-violet-300/10',
   },
+  {
+    id: 'strawberry',
+    fruit: 'Key 7',
+    emoji: '🍓',
+    pitch: 'B4',
+    frequency: 493.88,
+    shortcut: 'j',
+    accent:
+      'border-pink-300/20 bg-pink-300/[0.06] hover:border-pink-200/50 hover:bg-pink-300/10',
+  },
+  {
+    id: 'pineapple',
+    fruit: 'Key 8',
+    emoji: '🍍',
+    pitch: 'C5',
+    frequency: 523.25,
+    shortcut: 'k',
+    accent:
+      'border-amber-300/20 bg-amber-300/[0.06] hover:border-amber-200/50 hover:bg-amber-300/10',
+  },
+  {
+    id: 'cherry',
+    fruit: 'Key 9',
+    emoji: '🍒',
+    pitch: 'D5',
+    frequency: 587.33,
+    shortcut: 'l',
+    accent:
+      'border-red-300/20 bg-red-300/[0.06] hover:border-red-200/50 hover:bg-red-300/10',
+  },
+  {
+    id: 'pear',
+    fruit: 'Key 10',
+    emoji: '🍐',
+    pitch: 'E5',
+    frequency: 659.25,
+    shortcut: ';',
+    accent:
+      'border-green-300/20 bg-green-300/[0.06] hover:border-green-200/50 hover:bg-green-300/10',
+  },
+  {
+    id: 'peach',
+    fruit: 'Key 11',
+    emoji: '🍑',
+    pitch: 'F5',
+    frequency: 698.46,
+    shortcut: "'",
+    accent:
+      'border-orange-200/20 bg-orange-200/[0.06] hover:border-orange-100/50 hover:bg-orange-200/10',
+  },
+  {
+    id: 'kiwi',
+    fruit: 'Key 12',
+    emoji: '🥝',
+    pitch: 'G5',
+    frequency: 783.99,
+    shortcut: '\\',
+    accent:
+      'border-teal-300/20 bg-teal-300/[0.06] hover:border-teal-200/50 hover:bg-teal-300/10',
+  },
 ] as const
 
 type FruitNote = (typeof fruitNotes)[number]
 type AudioState = 'idle' | 'starting' | 'ready' | 'error'
 type SerialKeyAction = 'down' | 'up' | 'reset'
+type SerialBoardIndex = 0 | 1
+
+const notesPerBoard = 6
+const serialKeyIds = fruitNotes.slice(0, notesPerBoard).map((note) => note.id)
 
 function audioErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
@@ -165,11 +229,7 @@ function Keys() {
     )
   }
 
-  return (
-    <SerialProvider>
-      <KeysWorkspace />
-    </SerialProvider>
-  )
+  return <KeysWorkspace />
 }
 
 function KeysWorkspace() {
@@ -372,31 +432,45 @@ function KeysWorkspace() {
     }
   }
 
-  function handleSerialKey(action: SerialKeyAction, noteId?: string) {
+  function handleSerialKey(
+    boardIndex: SerialBoardIndex,
+    action: SerialKeyAction,
+    noteId?: string,
+  ) {
+    const boardSourcePrefix = `serial:${boardIndex}:`
     if (action === 'reset') {
       for (const source of sustainedSourcesRef.current) {
-        if (source.startsWith('serial:')) releaseNote(source)
+        if (source.startsWith(boardSourcePrefix)) releaseNote(source)
       }
-      serialPressedRef.current.clear()
+      for (const source of serialPressedRef.current) {
+        if (source.startsWith(boardSourcePrefix)) {
+          serialPressedRef.current.delete(source)
+        }
+      }
       setActiveSources(
         (current) =>
           new Set(
-            [...current].filter((source) => !source.startsWith('serial:')),
+            [...current].filter(
+              (source) => !source.startsWith(boardSourcePrefix),
+            ),
           ),
       )
       return
     }
 
-    const note = fruitNotes.find((candidate) => candidate.id === noteId)
-    if (!note) return
+    const localKeyIndex = serialKeyIds.findIndex(
+      (candidate) => candidate === noteId,
+    )
+    if (localKeyIndex < 0) return
 
-    const source = `serial:${note.id}`
+    const note = fruitNotes[boardIndex * notesPerBoard + localKeyIndex]
+    const source = `${boardSourcePrefix}${note.id}`
     if (action === 'down') {
-      if (serialPressedRef.current.has(note.id)) return
-      serialPressedRef.current.add(note.id)
+      if (serialPressedRef.current.has(source)) return
+      serialPressedRef.current.add(source)
       playKey(note, source, false, sustainOnHold)
     } else {
-      serialPressedRef.current.delete(note.id)
+      serialPressedRef.current.delete(source)
       releaseNote(source)
     }
   }
@@ -539,7 +613,7 @@ function KeysWorkspace() {
           </Alert>
         )}
 
-        <section className="grid gap-5 py-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <section className="grid gap-5 py-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <Card className="relative p-6">
             <div
               aria-hidden="true"
@@ -585,10 +659,17 @@ function KeysWorkspace() {
               </div>
             </div>
           </Card>
-          <SerialConnection
-            onPrepareAudio={prepareAudio}
-            onSerialKey={handleSerialKey}
-          />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+            {([0, 1] as const).map((boardIndex) => (
+              <SerialProvider key={boardIndex}>
+                <SerialConnection
+                  boardIndex={boardIndex}
+                  onPrepareAudio={prepareAudio}
+                  onSerialKey={handleSerialKey}
+                />
+              </SerialProvider>
+            ))}
+          </div>
         </section>
 
         <Card
@@ -604,7 +685,7 @@ function KeysWorkspace() {
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
               <p className="font-mono text-xs text-muted-foreground">
-                Click, touch, or use A S D F G H
+                Click, touch, or use A S D F G H J K L ; &apos; \
               </p>
               <div
                 role="group"
@@ -1141,11 +1222,17 @@ function KeysWorkspace() {
 }
 
 function SerialConnection({
+  boardIndex,
   onPrepareAudio,
   onSerialKey,
 }: {
+  boardIndex: SerialBoardIndex
   onPrepareAudio: () => void
-  onSerialKey: (action: SerialKeyAction, noteId?: string) => void
+  onSerialKey: (
+    boardIndex: SerialBoardIndex,
+    action: SerialKeyAction,
+    noteId?: string,
+  ) => void
 }) {
   const {
     error,
@@ -1170,9 +1257,12 @@ function SerialConnection({
   const subscriptionRequestedRef = useRef(false)
   const wasConnectedRef = useRef(false)
   const portInfo = port?.getInfo()
+  const boardNumber = boardIndex + 1
+  const keyRange = boardIndex === 0 ? 'Keys 1-6 / A0-A5' : 'Keys 7-12 / A0-A5'
 
   const dispatchSerialKey = useEffectEvent(
-    (action: SerialKeyAction, noteId?: string) => onSerialKey(action, noteId),
+    (action: SerialKeyAction, noteId?: string) =>
+      onSerialKey(boardIndex, action, noteId),
   )
   const beginReading = useEffectEvent(() => startSubscribe())
   const closeFailedConnection = useEffectEvent(() => {
@@ -1233,20 +1323,32 @@ function SerialConnection({
         const command = match[1] as 'DOWN' | 'UP'
         const noteId = match[2]
         if (!noteId) continue
+        const localKeyIndex = serialKeyIds.findIndex(
+          (candidate) => candidate === noteId,
+        )
+        if (localKeyIndex < 0) {
+          setLastEvent(`Ignored unknown key: ${noteId}`)
+          continue
+        }
         dispatchSerialKey(command === 'DOWN' ? 'down' : 'up', noteId)
-        setLastEvent(`${command === 'DOWN' ? 'Pressed' : 'Released'} ${noteId}`)
+        const keyNumber = boardIndex * notesPerBoard + localKeyIndex + 1
+        setLastEvent(
+          `${command === 'DOWN' ? 'Pressed' : 'Released'} key ${keyNumber}`,
+        )
       }
     }
   }, [receivedData])
 
   if (!isAvailableSerialApi) {
+    if (boardIndex === 1) return null
+
     return (
-      <Alert className="border-amber-500/30 bg-amber-500/10 p-6">
+      <Alert className="border-amber-500/30 bg-amber-500/10 p-6 sm:col-span-2 xl:col-span-1">
         <PlugZap className="mb-3 size-6 text-amber-500" />
         <AlertTitle className="text-lg">Web Serial unavailable</AlertTitle>
         <AlertDescription className="mt-2 leading-6">
-          Use desktop Chrome or Edge over HTTPS or localhost. Browser keys still
-          work without a board.
+          Use desktop Chrome or Edge over HTTPS or localhost to connect both
+          boards. Browser keys still work without them.
         </AlertDescription>
       </Alert>
     )
@@ -1256,9 +1358,11 @@ function SerialConnection({
     <Card role="complementary" className="gap-0 p-5">
       <CardHeader className="flex-row items-start justify-between gap-4 px-0">
         <div>
-          <p className="text-xs text-muted-foreground">Web Serial</p>
+          <p className="text-xs text-muted-foreground">
+            Arduino {boardNumber} · {keyRange}
+          </p>
           <h2 className="mt-1 text-base font-medium">
-            {isConnected ? 'Arduino connected' : 'Connect your keyboard'}
+            {isConnected ? 'Board connected' : `Connect board ${boardNumber}`}
           </h2>
         </div>
         <Badge
@@ -1305,7 +1409,10 @@ function SerialConnection({
               void connect()
             }}
           >
-            <Cable /> {isConnecting ? 'Selecting port...' : 'Select Arduino'}
+            <Cable />{' '}
+            {isConnecting
+              ? 'Selecting port...'
+              : `Select Arduino ${boardNumber}`}
           </Button>
         )}
 
