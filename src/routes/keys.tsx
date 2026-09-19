@@ -180,6 +180,22 @@ type SerialBoardIndex = 0 | 1
 
 const notesPerBoard = 6
 const serialKeyIds = fruitNotes.slice(0, notesPerBoard).map((note) => note.id)
+const minimumKeyCount = 6
+const defaultKeyCount = 7
+const keyCountStorageKey = 'fruit-keyboard-key-count'
+const keyCountOptions = Array.from(
+  { length: fruitNotes.length - minimumKeyCount + 1 },
+  (_, index) => minimumKeyCount + index,
+)
+
+function loadKeyCount() {
+  try {
+    const stored = Number(window.localStorage.getItem(keyCountStorageKey))
+    return keyCountOptions.includes(stored) ? stored : defaultKeyCount
+  } catch {
+    return defaultKeyCount
+  }
+}
 
 function audioErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
@@ -233,6 +249,7 @@ function Keys() {
 }
 
 function KeysWorkspace() {
+  const [keyCount, setKeyCount] = useState(loadKeyCount)
   const [activeSources, setActiveSources] = useState<Set<string>>(
     () => new Set(),
   )
@@ -257,6 +274,9 @@ function KeysWorkspace() {
   const sustainedSourcesRef = useRef<Set<string>>(new Set())
   const serialPressedRef = useRef<Set<string>>(new Set())
   audioConfigRef.current = audioConfig
+  const activeNotes = fruitNotes.slice(0, keyCount)
+  const activeBoardIndexes: Array<SerialBoardIndex> =
+    keyCount > notesPerBoard ? [0, 1] : [0]
 
   function updateMapping(keyId: FruitKeyId, mapping: KeyMapping) {
     setAudioConfig((current) => ({
@@ -383,6 +403,30 @@ function KeysWorkspace() {
     sustainedSourcesRef.current.clear()
   }
 
+  function updateKeyCount(nextKeyCount: number) {
+    setKeyCount(nextKeyCount)
+    try {
+      window.localStorage.setItem(keyCountStorageKey, String(nextKeyCount))
+    } catch {
+      // The selected count still works for this session if storage is blocked.
+    }
+
+    const inactiveKeyIds = fruitNotes.slice(nextKeyCount).map((note) => note.id)
+    const belongsToInactiveKey = (source: string) =>
+      inactiveKeyIds.some((keyId) => source.endsWith(`:${keyId}`))
+
+    for (const source of sustainedSourcesRef.current) {
+      if (belongsToInactiveKey(source)) releaseNote(source)
+    }
+    for (const source of serialPressedRef.current) {
+      if (belongsToInactiveKey(source)) serialPressedRef.current.delete(source)
+    }
+    setActiveSources(
+      (current) =>
+        new Set([...current].filter((source) => !belongsToInactiveKey(source))),
+    )
+  }
+
   function playKey(
     note: FruitNote,
     source: string,
@@ -463,7 +507,10 @@ function KeysWorkspace() {
     )
     if (localKeyIndex < 0) return
 
-    const note = fruitNotes[boardIndex * notesPerBoard + localKeyIndex]
+    const noteIndex = boardIndex * notesPerBoard + localKeyIndex
+    if (noteIndex >= keyCount) return
+
+    const note = fruitNotes[noteIndex]
     const source = `${boardSourcePrefix}${note.id}`
     if (action === 'down') {
       if (serialPressedRef.current.has(source)) return
@@ -496,7 +543,7 @@ function KeysWorkspace() {
       return
     }
 
-    const note = fruitNotes.find(
+    const note = activeNotes.find(
       (candidate) => candidate.shortcut === event.key.toLowerCase(),
     )
     if (!note) return
@@ -506,7 +553,7 @@ function KeysWorkspace() {
   })
 
   const handleShortcutKeyUp = useEffectEvent((event: KeyboardEvent) => {
-    const note = fruitNotes.find(
+    const note = activeNotes.find(
       (candidate) => candidate.shortcut === event.key.toLowerCase(),
     )
     if (note) releaseNote(`shortcut:${note.id}`)
@@ -660,9 +707,10 @@ function KeysWorkspace() {
             </div>
           </Card>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-            {([0, 1] as const).map((boardIndex) => (
+            {activeBoardIndexes.map((boardIndex) => (
               <SerialProvider key={boardIndex}>
                 <SerialConnection
+                  activeKeyCount={keyCount}
                   boardIndex={boardIndex}
                   onPrepareAudio={prepareAudio}
                   onSerialKey={handleSerialKey}
@@ -685,8 +733,31 @@ function KeysWorkspace() {
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
               <p className="font-mono text-xs text-muted-foreground">
-                Click, touch, or use A S D F G H J K L ; &apos; \
+                Click, touch, or use{' '}
+                {activeNotes
+                  .map((note) => note.shortcut.toUpperCase())
+                  .join(' ')}
               </p>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="key-count" className="text-xs">
+                  Keys
+                </Label>
+                <NativeSelect
+                  id="key-count"
+                  size="sm"
+                  value={keyCount}
+                  aria-label="Number of instrument keys"
+                  onChange={(event) =>
+                    updateKeyCount(Number(event.target.value))
+                  }
+                >
+                  {keyCountOptions.map((count) => (
+                    <NativeSelectOption key={count} value={count}>
+                      {count}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </div>
               <div
                 role="group"
                 aria-label="Sound set"
@@ -765,7 +836,7 @@ function KeysWorkspace() {
           </CardHeader>
 
           <CardContent className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 sm:gap-4 sm:p-6 lg:grid-cols-6">
-            {fruitNotes.map((note) => {
+            {activeNotes.map((note) => {
               const isActive = [...activeSources].some((source) =>
                 source.endsWith(`:${note.id}`),
               )
@@ -998,7 +1069,7 @@ function KeysWorkspace() {
               >
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium">Key assignments</h3>
-                  {fruitNotes.map((note) => {
+                  {activeNotes.map((note) => {
                     const mapping = audioConfig.mappings[note.id]
                     const clip =
                       mapping.kind === 'clip'
@@ -1222,10 +1293,12 @@ function KeysWorkspace() {
 }
 
 function SerialConnection({
+  activeKeyCount,
   boardIndex,
   onPrepareAudio,
   onSerialKey,
 }: {
+  activeKeyCount: number
   boardIndex: SerialBoardIndex
   onPrepareAudio: () => void
   onSerialKey: (
@@ -1258,7 +1331,14 @@ function SerialConnection({
   const wasConnectedRef = useRef(false)
   const portInfo = port?.getInfo()
   const boardNumber = boardIndex + 1
-  const keyRange = boardIndex === 0 ? 'Keys 1-6 / A0-A5' : 'Keys 7-12 / A0-A5'
+  const activeKeysOnBoard = Math.min(
+    notesPerBoard,
+    activeKeyCount - boardIndex * notesPerBoard,
+  )
+  const firstKeyNumber = boardIndex * notesPerBoard + 1
+  const lastKeyNumber = firstKeyNumber + activeKeysOnBoard - 1
+  const lastPinNumber = activeKeysOnBoard - 1
+  const keyRange = `Keys ${firstKeyNumber}-${lastKeyNumber} / A0-A${lastPinNumber}`
 
   const dispatchSerialKey = useEffectEvent(
     (action: SerialKeyAction, noteId?: string) =>
@@ -1330,8 +1410,12 @@ function SerialConnection({
           setLastEvent(`Ignored unknown key: ${noteId}`)
           continue
         }
-        dispatchSerialKey(command === 'DOWN' ? 'down' : 'up', noteId)
         const keyNumber = boardIndex * notesPerBoard + localKeyIndex + 1
+        if (keyNumber > activeKeyCount) {
+          setLastEvent(`Ignored inactive key ${keyNumber}`)
+          continue
+        }
+        dispatchSerialKey(command === 'DOWN' ? 'down' : 'up', noteId)
         setLastEvent(
           `${command === 'DOWN' ? 'Pressed' : 'Released'} key ${keyNumber}`,
         )
