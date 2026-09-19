@@ -20,6 +20,7 @@ import { Checkbox } from '#/components/ui/checkbox'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '#/components/ui/native-select'
+import { useLocale } from '#/lib/i18n'
 
 export const Route = createFileRoute('/')({ component: Home })
 
@@ -34,7 +35,84 @@ const fieldClassName = 'mt-2 h-9 w-full'
 
 const selectClassName = 'mt-2 w-full [&_select]:h-9'
 
+const copy = {
+  'en-US': {
+    environment: 'Chromium / HTTPS or localhost',
+    initializing: 'Initializing serial interface...',
+    unavailable: 'Web Serial is unavailable',
+    unavailableDescription:
+      'Open this page in a Chromium-based browser over HTTPS or localhost to connect to a serial device.',
+    linkSetup: 'Link setup',
+    portParameters: 'Port parameters',
+    baudRate: 'Baud rate',
+    dataBits: 'Data bits',
+    stopBits: 'Stop bits',
+    parity: 'Parity',
+    flowControl: 'Flow control',
+    bufferSize: 'Buffer size (bytes)',
+    none: 'None',
+    even: 'Even',
+    odd: 'Odd',
+    hardware: 'Hardware',
+    disconnect: 'Disconnect',
+    selectingPort: 'Selecting port...',
+    selectPort: 'Select port',
+    settingsLock: 'Settings lock while connected',
+    serialOutput: 'Serial output',
+    chunks: 'chunks',
+    stopReading: 'Stop reading',
+    startReading: 'Start reading',
+    clearOutput: 'Clear output',
+    startToView: 'Start reading to view data',
+    noDevice: 'No device connected',
+    typeCommand: 'Type a command...',
+    connectToSend: 'Connect to send data',
+    messageToSend: 'Message to send',
+    send: 'Send',
+    appendNewline: 'Append newline (LF)',
+    cancelled: 'Port selection was cancelled.',
+  },
+  'pt-BR': {
+    environment: 'Chromium / HTTPS ou localhost',
+    initializing: 'Inicializando a interface serial...',
+    unavailable: 'Web Serial não está disponível',
+    unavailableDescription:
+      'Abra esta página em um navegador baseado em Chromium por HTTPS ou localhost para conectar um dispositivo serial.',
+    linkSetup: 'Configuração da conexão',
+    portParameters: 'Parâmetros da porta',
+    baudRate: 'Taxa de transmissão',
+    dataBits: 'Bits de dados',
+    stopBits: 'Bits de parada',
+    parity: 'Paridade',
+    flowControl: 'Controle de fluxo',
+    bufferSize: 'Tamanho do buffer (bytes)',
+    none: 'Nenhuma',
+    even: 'Par',
+    odd: 'Ímpar',
+    hardware: 'Hardware',
+    disconnect: 'Desconectar',
+    selectingPort: 'Selecionando porta...',
+    selectPort: 'Selecionar porta',
+    settingsLock: 'As configurações são bloqueadas durante a conexão',
+    serialOutput: 'Saída serial',
+    chunks: 'blocos',
+    stopReading: 'Parar leitura',
+    startReading: 'Iniciar leitura',
+    clearOutput: 'Limpar saída',
+    startToView: 'Inicie a leitura para visualizar os dados',
+    noDevice: 'Nenhum dispositivo conectado',
+    typeCommand: 'Digite um comando...',
+    connectToSend: 'Conecte para enviar dados',
+    messageToSend: 'Mensagem a enviar',
+    send: 'Enviar',
+    appendNewline: 'Adicionar nova linha (LF)',
+    cancelled: 'A seleção da porta foi cancelada.',
+  },
+} as const
+
 function Home() {
+  const { locale } = useLocale()
+  const text = copy[locale]
   const isClient = useSyncExternalStore(
     emptySubscribe,
     () => true,
@@ -47,7 +125,7 @@ function Home() {
         <header className="flex flex-wrap items-center justify-end gap-3">
           <Badge variant="outline" className="h-8 gap-2 text-muted-foreground">
             <Cable className="size-4" />
-            Chromium / HTTPS or localhost
+            {text.environment}
           </Badge>
         </header>
 
@@ -60,7 +138,7 @@ function Home() {
             role="status"
             className="grid min-h-96 place-items-center font-mono text-sm text-muted-foreground"
           >
-            Initializing serial interface...
+            {text.initializing}
           </Card>
         )}
       </div>
@@ -69,6 +147,8 @@ function Home() {
 }
 
 function SerialWorkspace() {
+  const { locale } = useLocale()
+  const text = copy[locale]
   const [serialOptions, setSerialOptions] = useState<SerialOptions>({
     baudRate: 9600,
     dataBits: 8,
@@ -124,11 +204,10 @@ function SerialWorkspace() {
       <Alert className="border-amber-500/30 bg-amber-500/10 p-8 text-center">
         <PlugZap className="mx-auto mb-4 size-8 text-amber-500" />
         <AlertTitle>
-          <h2 className="text-xl font-semibold">Web Serial is unavailable</h2>
+          <h2 className="text-xl font-semibold">{text.unavailable}</h2>
         </AlertTitle>
         <AlertDescription className="mx-auto mt-2 max-w-lg text-sm leading-6">
-          Open this page in a Chromium-based browser over HTTPS or localhost to
-          connect to a serial device.
+          {text.unavailableDescription}
         </AlertDescription>
       </Alert>
     )
@@ -140,9 +219,11 @@ function SerialWorkspace() {
         <CardHeader className="mb-6 flex items-start justify-between gap-4 px-0">
           <div>
             <p className="font-mono text-[0.68rem] tracking-[0.18em] text-muted-foreground uppercase">
-              Link setup
+              {text.linkSetup}
             </p>
-            <h2 className="mt-1 text-lg font-semibold">Port parameters</h2>
+            <h2 className="mt-1 text-lg font-semibold">
+              {text.portParameters}
+            </h2>
           </div>
           <span
             className={`mt-1 size-2.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`}
@@ -155,7 +236,7 @@ function SerialWorkspace() {
               htmlFor="baud-rate"
               className="text-xs text-muted-foreground"
             >
-              Baud rate
+              {text.baudRate}
             </Label>
             <Input
               id="baud-rate"
@@ -174,7 +255,7 @@ function SerialWorkspace() {
             <datalist id="baud-rates">
               {baudRates.map((rate) => (
                 <NativeSelectOption key={rate} value={rate}>
-                  {rate.toLocaleString()} baud
+                  {rate.toLocaleString(locale)} baud
                 </NativeSelectOption>
               ))}
             </datalist>
@@ -185,7 +266,7 @@ function SerialWorkspace() {
               htmlFor="data-bits"
               className="text-xs text-muted-foreground"
             >
-              Data bits
+              {text.dataBits}
             </Label>
             <NativeSelect
               id="data-bits"
@@ -205,7 +286,7 @@ function SerialWorkspace() {
               htmlFor="stop-bits"
               className="text-xs text-muted-foreground"
             >
-              Stop bits
+              {text.stopBits}
             </Label>
             <NativeSelect
               id="stop-bits"
@@ -222,7 +303,7 @@ function SerialWorkspace() {
 
           <div>
             <Label htmlFor="parity" className="text-xs text-muted-foreground">
-              Parity
+              {text.parity}
             </Label>
             <NativeSelect
               id="parity"
@@ -232,9 +313,9 @@ function SerialWorkspace() {
                 updateOption('parity', event.target.value as ParityType)
               }
             >
-              <NativeSelectOption value="none">None</NativeSelectOption>
-              <NativeSelectOption value="even">Even</NativeSelectOption>
-              <NativeSelectOption value="odd">Odd</NativeSelectOption>
+              <NativeSelectOption value="none">{text.none}</NativeSelectOption>
+              <NativeSelectOption value="even">{text.even}</NativeSelectOption>
+              <NativeSelectOption value="odd">{text.odd}</NativeSelectOption>
             </NativeSelect>
           </div>
 
@@ -243,7 +324,7 @@ function SerialWorkspace() {
               htmlFor="flow-control"
               className="text-xs text-muted-foreground"
             >
-              Flow control
+              {text.flowControl}
             </Label>
             <NativeSelect
               id="flow-control"
@@ -256,8 +337,10 @@ function SerialWorkspace() {
                 )
               }
             >
-              <NativeSelectOption value="none">None</NativeSelectOption>
-              <NativeSelectOption value="hardware">Hardware</NativeSelectOption>
+              <NativeSelectOption value="none">{text.none}</NativeSelectOption>
+              <NativeSelectOption value="hardware">
+                {text.hardware}
+              </NativeSelectOption>
             </NativeSelect>
           </div>
 
@@ -266,7 +349,7 @@ function SerialWorkspace() {
               htmlFor="buffer-size"
               className="text-xs text-muted-foreground"
             >
-              Buffer size (bytes)
+              {text.bufferSize}
             </Label>
             <Input
               id="buffer-size"
@@ -292,7 +375,7 @@ function SerialWorkspace() {
               variant="destructive"
               onClick={() => void disconnect()}
             >
-              <Unplug /> Disconnect
+              <Unplug /> {text.disconnect}
             </Button>
           ) : (
             <Button
@@ -300,13 +383,14 @@ function SerialWorkspace() {
               disabled={isConnecting}
               onClick={() => void connect()}
             >
-              <PlugZap /> {isConnecting ? 'Selecting port...' : 'Select port'}
+              <PlugZap />
+              {isConnecting ? text.selectingPort : text.selectPort}
             </Button>
           )}
           <p className="mt-3 text-center font-mono text-[0.68rem] text-muted-foreground">
             {isConnected
               ? `USB ${portInfo?.usbVendorId ?? '-'}:${portInfo?.usbProductId ?? '-'}`
-              : 'Settings lock while connected'}
+              : text.settingsLock}
           </p>
         </div>
       </Card>
@@ -316,13 +400,13 @@ function SerialWorkspace() {
           <div className="flex items-center gap-3">
             <TerminalSquare className="size-4 text-primary" />
             <span className="font-mono text-xs font-semibold tracking-wider uppercase">
-              Serial output
+              {text.serialOutput}
             </span>
             <Badge
               variant="secondary"
               className="h-auto px-2 py-1 font-mono text-[0.65rem] text-muted-foreground"
             >
-              {receivedData.length} chunks
+              {receivedData.length} {text.chunks}
             </Badge>
           </div>
           <div className="flex items-center gap-2">
@@ -332,7 +416,7 @@ function SerialWorkspace() {
                 variant="outline"
                 onClick={() => void stopSubscribe()}
               >
-                <CircleStop /> Stop reading
+                <CircleStop /> {text.stopReading}
               </Button>
             ) : (
               <Button
@@ -341,13 +425,13 @@ function SerialWorkspace() {
                 disabled={!isConnected}
                 onClick={() => startSubscribe()}
               >
-                <Cable /> Start reading
+                <Cable /> {text.startReading}
               </Button>
             )}
             <Button
               size="icon-sm"
               variant="ghost"
-              aria-label="Clear output"
+              aria-label={text.clearOutput}
               disabled={receivedData.length === 0}
               onClick={clearReceivedData}
             >
@@ -364,18 +448,14 @@ function SerialWorkspace() {
             <div className="grid h-full min-h-64 place-items-center text-center text-muted-foreground">
               <div>
                 <TerminalSquare className="mx-auto mb-3 size-7 opacity-60" />
-                <p>
-                  {isConnected
-                    ? 'Start reading to view data'
-                    : 'No device connected'}
-                </p>
+                <p>{isConnected ? text.startToView : text.noDevice}</p>
               </div>
             </div>
           ) : (
             receivedData.map((entry, index) => (
               <div key={`${entry.timestamp.toISOString()}-${index}`}>
                 <span className="mr-3 select-none text-muted-foreground/50">
-                  {entry.timestamp.toLocaleTimeString()}
+                  {entry.timestamp.toLocaleTimeString(locale)}
                 </span>
                 <span className="whitespace-pre-wrap break-all">
                   {entry.mode === 'text'
@@ -396,10 +476,8 @@ function SerialWorkspace() {
               className="h-10 min-w-0 flex-1 font-mono"
               value={message}
               disabled={!isConnected}
-              placeholder={
-                isConnected ? 'Type a command...' : 'Connect to send data'
-              }
-              aria-label="Message to send"
+              placeholder={isConnected ? text.typeCommand : text.connectToSend}
+              aria-label={text.messageToSend}
               onChange={(event) => setMessage(event.target.value)}
             />
             <Button
@@ -407,7 +485,7 @@ function SerialWorkspace() {
               type="submit"
               disabled={!isConnected || !message}
             >
-              <Send /> <span className="hidden sm:inline">Send</span>
+              <Send /> <span className="hidden sm:inline">{text.send}</span>
             </Button>
           </div>
           <div className="mt-3 flex w-fit items-center gap-2">
@@ -420,7 +498,7 @@ function SerialWorkspace() {
               htmlFor="append-newline"
               className="text-xs text-muted-foreground"
             >
-              Append newline (LF)
+              {text.appendNewline}
             </Label>
           </div>
         </form>
@@ -430,7 +508,7 @@ function SerialWorkspace() {
             variant="destructive"
             className="rounded-none border-0 border-t px-4 py-3 text-xs"
           >
-            {error?.message ?? 'Port selection was cancelled.'}
+            {error?.message ?? text.cancelled}
           </Alert>
         )}
       </Card>

@@ -40,6 +40,8 @@ import {
 } from '#/lib/browser-audio-storage'
 import type { NoteNotation } from '#/lib/note-notation'
 import { formatNote } from '#/lib/note-notation'
+import { useLocale } from '#/lib/i18n'
+import type { Locale } from '#/lib/i18n'
 import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/keys')({
@@ -164,6 +166,11 @@ type FruitNote = (typeof fruitNotes)[number]
 type AudioState = 'idle' | 'starting' | 'ready' | 'error'
 type SerialKeyAction = 'down' | 'up' | 'reset'
 type SerialBoardIndex = 0 | 1
+type SerialEvent =
+  | { kind: 'waiting' | 'disconnected' | 'invalid' | 'ready' }
+  | { kind: 'ignored' | 'unknown-key'; value: string }
+  | { kind: 'inactive-key'; keyNumber: number }
+  | { kind: 'key'; action: 'pressed' | 'released'; keyNumber: number }
 
 const notesPerBoard = 6
 const serialKeyIds = fruitNotes.slice(0, notesPerBoard).map((note) => note.id)
@@ -175,6 +182,205 @@ const keyCountOptions = Array.from(
   (_, index) => minimumKeyCount + index,
 )
 
+const copy = {
+  'en-US': {
+    initializing: 'Initializing fruit keyboard...',
+    audioCouldNotStart:
+      'Audio could not start. Try a key again or check browser permissions.',
+    durationError: 'The audio duration could not be read.',
+    unplayableAudio: 'The selected file is not playable audio.',
+    audioUnavailable: 'Audio unavailable',
+    audioReady: 'Audio ready',
+    startingAudio: 'Starting audio',
+    waitingForKey: 'Waiting for a key',
+    arduinoOptional: 'Arduino optional',
+    arduinoConnections: 'Arduino connections',
+    connectionsDescription:
+      'Connect and monitor the boards that send key events.',
+    keys: 'Keys',
+    keysDescription: 'Click, touch, or use the shown keyboard shortcuts.',
+    lastSound: 'Last sound',
+    playToBegin: 'Play a key to begin',
+    numberOfKeys: 'Number of instrument keys',
+    playingNow: 'Playing now',
+    playClip: 'Play clip',
+    playNote: 'Play note',
+    focusedKey: 'Enter or Space also plays the focused key',
+    browserPlayback: 'Notes and uploaded clips play in your browser',
+    audioCustomization: 'Audio customization',
+    customizationDescription:
+      'Choose note names or assign audio files stored in this browser.',
+    soundSet: 'Sound set',
+    customAudios: 'Custom Audios',
+    holdToSustain: 'Hold to sustain',
+    loading: 'Loading…',
+    saving: 'Saving…',
+    unsavedChanges: 'Unsaved changes',
+    saveFailed: 'Save failed',
+    savedInBrowser: 'Saved in browser',
+    saveAssignments: 'Save assignments',
+    uploading: 'Uploading…',
+    uploadAudio: 'Upload audio',
+    collapseClips: 'Collapse audio clips',
+    manageAudios: 'Manage custom audios',
+    keyAssignments: 'Key assignments',
+    sound: 'Sound',
+    generated: 'Generated',
+    note: 'note',
+    startSeconds: 'Start (seconds)',
+    endSeconds: 'End (seconds)',
+    browserLibrary: 'Browser library',
+    clips: 'clips',
+    uploadToAssign: 'Upload an audio file to assign it to a key.',
+    unassignBeforeDelete: 'Unassign this clip before deleting it.',
+    deleteClip: 'Delete clip',
+    delete: 'Delete',
+    play: 'Play',
+    audioClip: 'audio clip',
+    keyboardShortcut: 'Keyboard shortcut',
+    holdInstruction: 'Hold to sustain.',
+    waitingForBoard: 'Waiting for board input',
+    boardDisconnected: 'Board disconnected',
+    invalidMessage: 'Ignored an invalid serial message',
+    arduinoReady: 'Arduino is ready',
+    ignored: 'Ignored',
+    unknownKey: 'Ignored unknown key',
+    inactiveKey: 'Ignored inactive key',
+    pressed: 'Pressed',
+    released: 'Released',
+    key: 'key',
+    webSerialUnavailable: 'Web Serial unavailable',
+    serialUnavailableDescription:
+      'Use desktop Chrome or Edge over HTTPS or localhost to connect both boards. Browser keys still work without them.',
+    boardConnected: 'Board connected',
+    connectBoard: 'Connect board',
+    listening: 'Listening',
+    opening: 'Opening',
+    offline: 'Offline',
+    lastSerialEvent: 'Last serial event',
+    disconnect: 'Disconnect',
+    selectingPort: 'Selecting port...',
+    selectArduino: 'Select Arduino',
+    clickToSelect: 'Port selection requires a click',
+    cancelled: 'Port selection was cancelled.',
+  },
+  'pt-BR': {
+    initializing: 'Inicializando o teclado de frutas...',
+    audioCouldNotStart:
+      'Não foi possível iniciar o áudio. Tente uma tecla novamente ou verifique as permissões do navegador.',
+    durationError: 'Não foi possível ler a duração do áudio.',
+    unplayableAudio: 'O arquivo selecionado não é um áudio reproduzível.',
+    audioUnavailable: 'Áudio indisponível',
+    audioReady: 'Áudio pronto',
+    startingAudio: 'Iniciando áudio',
+    waitingForKey: 'Aguardando uma tecla',
+    arduinoOptional: 'Arduino opcional',
+    arduinoConnections: 'Conexões Arduino',
+    connectionsDescription:
+      'Conecte e monitore as placas que enviam eventos de tecla.',
+    keys: 'Teclas',
+    keysDescription: 'Clique, toque ou use os atalhos de teclado exibidos.',
+    lastSound: 'Último som',
+    playToBegin: 'Toque uma tecla para começar',
+    numberOfKeys: 'Número de teclas do instrumento',
+    playingNow: 'Tocando agora',
+    playClip: 'Reproduzir áudio',
+    playNote: 'Tocar nota',
+    focusedKey: 'Enter ou Espaço também toca a tecla em foco',
+    browserPlayback: 'Notas e áudios enviados são reproduzidos no navegador',
+    audioCustomization: 'Personalização de áudio',
+    customizationDescription:
+      'Escolha os nomes das notas ou atribua arquivos de áudio armazenados neste navegador.',
+    soundSet: 'Conjunto de sons',
+    customAudios: 'Áudios personalizados',
+    holdToSustain: 'Segure para sustentar',
+    loading: 'Carregando…',
+    saving: 'Salvando…',
+    unsavedChanges: 'Alterações não salvas',
+    saveFailed: 'Falha ao salvar',
+    savedInBrowser: 'Salvo no navegador',
+    saveAssignments: 'Salvar atribuições',
+    uploading: 'Enviando…',
+    uploadAudio: 'Enviar áudio',
+    collapseClips: 'Recolher áudios',
+    manageAudios: 'Gerenciar áudios personalizados',
+    keyAssignments: 'Atribuições das teclas',
+    sound: 'Som',
+    generated: 'Nota',
+    note: 'gerada',
+    startSeconds: 'Início (segundos)',
+    endSeconds: 'Fim (segundos)',
+    browserLibrary: 'Biblioteca do navegador',
+    clips: 'áudios',
+    uploadToAssign: 'Envie um arquivo de áudio para atribuí-lo a uma tecla.',
+    unassignBeforeDelete: 'Remova a atribuição deste áudio antes de excluí-lo.',
+    deleteClip: 'Excluir áudio',
+    delete: 'Excluir',
+    play: 'Tocar',
+    audioClip: 'áudio',
+    keyboardShortcut: 'Atalho de teclado',
+    holdInstruction: 'Segure para sustentar.',
+    waitingForBoard: 'Aguardando entrada da placa',
+    boardDisconnected: 'Placa desconectada',
+    invalidMessage: 'Mensagem serial inválida ignorada',
+    arduinoReady: 'Arduino pronto',
+    ignored: 'Ignorado',
+    unknownKey: 'Tecla desconhecida ignorada',
+    inactiveKey: 'Tecla inativa ignorada',
+    pressed: 'Pressionou',
+    released: 'Soltou',
+    key: 'tecla',
+    webSerialUnavailable: 'Web Serial indisponível',
+    serialUnavailableDescription:
+      'Use o Chrome ou Edge para desktop por HTTPS ou localhost para conectar as duas placas. As teclas do navegador continuam funcionando sem elas.',
+    boardConnected: 'Placa conectada',
+    connectBoard: 'Conectar placa',
+    listening: 'Escutando',
+    opening: 'Abrindo',
+    offline: 'Desconectado',
+    lastSerialEvent: 'Último evento serial',
+    disconnect: 'Desconectar',
+    selectingPort: 'Selecionando porta...',
+    selectArduino: 'Selecionar Arduino',
+    clickToSelect: 'A seleção da porta requer um clique',
+    cancelled: 'A seleção da porta foi cancelada.',
+  },
+} as const
+
+const portugueseErrorMessages: Record<string, string> = {
+  'Browser storage was interrupted.':
+    'O armazenamento do navegador foi interrompido.',
+  'Browser storage failed.': 'Falha no armazenamento do navegador.',
+  'This browser does not support local audio storage.':
+    'Este navegador não oferece armazenamento local de áudio.',
+  'A selected segment exceeds its audio duration.':
+    'Um trecho selecionado ultrapassa a duração do áudio.',
+  'The browser library is limited to 24 audio clips.':
+    'A biblioteca do navegador está limitada a 24 áudios.',
+  'The uploaded file does not match its audio format.':
+    'O arquivo enviado não corresponde ao seu formato de áudio.',
+  'Audio clip not found.': 'Áudio não encontrado.',
+  'Unassign this clip from every key before deleting it.':
+    'Remova a atribuição deste áudio de todas as teclas antes de excluí-lo.',
+  'This browser does not support Web Audio preview.':
+    'Este navegador não oferece prévia com Web Audio.',
+  'The uploaded audio could not be loaded.':
+    'Não foi possível carregar o áudio enviado.',
+  'The selected audio segment is outside this file.':
+    'O trecho de áudio selecionado está fora deste arquivo.',
+  'An audio segment must end after its start.':
+    'Um trecho de áudio deve terminar depois de seu início.',
+  'An audio segment cannot be longer than 120 seconds.':
+    'Um trecho de áudio não pode ter mais de 120 segundos.',
+  'Unsupported audio format. Use MP3, WAV, Ogg, WebM, or M4A.':
+    'Formato de áudio não aceito. Use MP3, WAV, Ogg, WebM ou M4A.',
+  'The audio file is empty.': 'O arquivo de áudio está vazio.',
+  'Audio files are limited to 10 MB.':
+    'Os arquivos de áudio estão limitados a 10 MB.',
+  'Audio duration must be between 0 and 10 minutes.':
+    'A duração do áudio deve estar entre 0 e 10 minutos.',
+}
+
 function loadKeyCount() {
   try {
     const stored = Number(window.localStorage.getItem(keyCountStorageKey))
@@ -184,15 +390,19 @@ function loadKeyCount() {
   }
 }
 
-function audioErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
+function audioErrorMessage(error: unknown, locale: Locale) {
+  if (error instanceof Error) {
+    return locale === 'pt-BR'
+      ? (portugueseErrorMessages[error.message] ?? error.message)
+      : error.message
+  }
 
-  return 'Audio could not start. Try a key again or check browser permissions.'
+  return copy[locale].audioCouldNotStart
 }
 
 const emptySubscribe = () => () => undefined
 
-function readAudioDuration(file: File) {
+function readAudioDuration(file: File, locale: Locale) {
   return new Promise<number>((resolve, reject) => {
     const audio = document.createElement('audio')
     const url = URL.createObjectURL(file)
@@ -205,17 +415,18 @@ function readAudioDuration(file: File) {
       const duration = audio.duration
       cleanup()
       if (Number.isFinite(duration) && duration > 0) resolve(duration)
-      else reject(new Error('The audio duration could not be read.'))
+      else reject(new Error(copy[locale].durationError))
     }
     audio.onerror = () => {
       cleanup()
-      reject(new Error('The selected file is not playable audio.'))
+      reject(new Error(copy[locale].unplayableAudio))
     }
     audio.src = url
   })
 }
 
 function Keys() {
+  const { locale } = useLocale()
   const isClient = useSyncExternalStore(
     emptySubscribe,
     () => true,
@@ -226,7 +437,7 @@ function Keys() {
     return (
       <div className="grid min-h-96 place-items-center p-4">
         <Card className="w-full max-w-lg py-10 text-center font-mono text-sm text-muted-foreground">
-          Initializing fruit keyboard...
+          {copy[locale].initializing}
         </Card>
       </div>
     )
@@ -236,6 +447,8 @@ function Keys() {
 }
 
 function KeysWorkspace() {
+  const { locale } = useLocale()
+  const text = copy[locale]
   const [keyCount, setKeyCount] = useState(loadKeyCount)
   const [activeSources, setActiveSources] = useState<Set<string>>(
     () => new Set(),
@@ -284,7 +497,7 @@ function KeysWorkspace() {
       setConfigStatus('saved')
     } catch (error) {
       setConfigStatus('error')
-      setConfigError(audioErrorMessage(error))
+      setConfigError(audioErrorMessage(error, locale))
     }
   }
 
@@ -296,7 +509,7 @@ function KeysWorkspace() {
     setUploading(true)
     setConfigError(null)
     try {
-      const durationSec = await readAudioDuration(file)
+      const durationSec = await readAudioDuration(file, locale)
       const next = await addBrowserAudioClip(audioConfig, file, durationSec)
       setAudioConfig(next)
       setUseAudioClips(true)
@@ -304,7 +517,7 @@ function KeysWorkspace() {
       setConfigStatus('saved')
     } catch (error) {
       setConfigStatus('error')
-      setConfigError(audioErrorMessage(error))
+      setConfigError(audioErrorMessage(error, locale))
     } finally {
       setUploading(false)
     }
@@ -319,7 +532,7 @@ function KeysWorkspace() {
       setConfigStatus('saved')
     } catch (error) {
       setConfigStatus('error')
-      setConfigError(audioErrorMessage(error))
+      setConfigError(audioErrorMessage(error, locale))
     } finally {
       setUploading(false)
     }
@@ -349,7 +562,7 @@ function KeysWorkspace() {
   function handleAudioError(player: FruitAudioPlayer | null, error: unknown) {
     if (audioPlayerRef.current === player) audioPlayerRef.current = null
     setAudioState('error')
-    setAudioError(audioErrorMessage(error))
+    setAudioError(audioErrorMessage(error, locale))
     void player?.dispose()
   }
 
@@ -571,7 +784,7 @@ function KeysWorkspace() {
       .catch((error: unknown) => {
         if (cancelled) return
         setConfigStatus('error')
-        setConfigError(audioErrorMessage(error))
+        setConfigError(audioErrorMessage(error, locale))
       })
 
     return () => {
@@ -602,12 +815,12 @@ function KeysWorkspace() {
   }, [])
 
   const audioStatus = audioError
-    ? 'Audio unavailable'
+    ? text.audioUnavailable
     : audioState === 'ready'
-      ? 'Audio ready'
+      ? text.audioReady
       : audioState === 'starting'
-        ? 'Starting audio'
-        : 'Waiting for a key'
+        ? text.startingAudio
+        : text.waitingForKey
   const lastPlayedMapping = lastPlayed
     ? audioConfig.mappings[lastPlayed.id]
     : undefined
@@ -637,7 +850,7 @@ function KeysWorkspace() {
               {audioStatus}
             </Badge>
             <Badge variant="secondary" className="h-8">
-              Arduino optional
+              {text.arduinoOptional}
             </Badge>
           </div>
         </header>
@@ -656,13 +869,13 @@ function KeysWorkspace() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 id="arduino-heading" className="text-base font-medium">
-                  Arduino connections
+                  {text.arduinoConnections}
                 </h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Connect and monitor the boards that send key events.
+                  {text.connectionsDescription}
                 </p>
               </div>
-              <Badge variant="secondary">Arduino optional</Badge>
+              <Badge variant="secondary">{text.arduinoOptional}</Badge>
             </div>
           </CardHeader>
           <CardContent className="grid gap-4 p-4 sm:p-6 lg:grid-cols-2">
@@ -687,16 +900,16 @@ function KeysWorkspace() {
           <CardHeader className="flex flex-wrap items-end justify-between gap-4 border-b px-5 py-5 sm:px-6">
             <div className="min-w-0">
               <h2 id="instrument-heading" className="text-base font-medium">
-                Keys
+                {text.keys}
               </h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Click, touch, or use the shown keyboard shortcuts.
+                {text.keysDescription}
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
               <div className="min-w-32 rounded-lg border bg-muted/30 px-3 py-2">
                 <p className="font-mono text-[0.6rem] tracking-wider text-muted-foreground uppercase">
-                  Last sound
+                  {text.lastSound}
                 </p>
                 <p
                   className="mt-0.5 max-w-48 truncate text-sm font-medium"
@@ -704,19 +917,19 @@ function KeysWorkspace() {
                 >
                   {lastPlayedClip?.originalName ??
                     (lastPlayed
-                      ? `${lastPlayed.fruit} · ${formatNote(lastPlayed.pitch, noteNotation)}`
-                      : 'Play a key to begin')}
+                      ? `${locale === 'pt-BR' ? lastPlayed.fruit.replace('Key', 'Tecla') : lastPlayed.fruit} · ${formatNote(lastPlayed.pitch, noteNotation)}`
+                      : text.playToBegin)}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <Label htmlFor="key-count" className="text-xs">
-                  Keys
+                  {text.keys}
                 </Label>
                 <NativeSelect
                   id="key-count"
                   size="sm"
                   value={keyCount}
-                  aria-label="Number of instrument keys"
+                  aria-label={text.numberOfKeys}
                   onChange={(event) =>
                     updateKeyCount(Number(event.target.value))
                   }
@@ -749,7 +962,7 @@ function KeysWorkspace() {
                   key={note.id}
                   variant="outline"
                   type="button"
-                  aria-label={`Play ${note.fruit}, ${useAudioClips && assignedClip ? `audio clip ${assignedClip.originalName}` : `${formatNote(note.pitch, noteNotation)} note`}. Keyboard shortcut ${note.shortcut.toUpperCase()}.${sustainOnHold ? ' Hold to sustain.' : ''}`}
+                  aria-label={`${text.play} ${locale === 'pt-BR' ? note.fruit.replace('Key', 'Tecla') : note.fruit}, ${useAudioClips && assignedClip ? `${text.audioClip} ${assignedClip.originalName}` : `${formatNote(note.pitch, noteNotation)} ${text.note}`}. ${text.keyboardShortcut} ${note.shortcut.toUpperCase()}.${sustainOnHold ? ` ${text.holdInstruction}` : ''}`}
                   aria-pressed={isActive}
                   className={cn(
                     'group relative h-auto min-h-44 min-w-0 touch-manipulation flex-col items-stretch justify-between overflow-hidden border p-4 text-left whitespace-normal transition duration-200 focus-visible:z-10 sm:min-h-48',
@@ -810,7 +1023,9 @@ function KeysWorkspace() {
                   </span>
                   <span className="relative mt-8">
                     <span className="block text-lg font-medium text-foreground">
-                      {note.fruit}
+                      {locale === 'pt-BR'
+                        ? note.fruit.replace('Key', 'Tecla')
+                        : note.fruit}
                     </span>
                     <span className="mt-1 block truncate font-mono text-[0.68rem] tracking-wide text-muted-foreground">
                       {useAudioClips && assignedClip && mapping.kind === 'clip'
@@ -822,10 +1037,10 @@ function KeysWorkspace() {
                     className={`relative mt-4 font-mono text-[0.62rem] tracking-[0.12em] uppercase transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
                   >
                     {isActive
-                      ? 'Playing now'
+                      ? text.playingNow
                       : useAudioClips && assignedClip
-                        ? 'Play clip'
-                        : 'Play note'}
+                        ? text.playClip
+                        : text.playNote}
                   </span>
                 </Button>
               )
@@ -835,10 +1050,10 @@ function KeysWorkspace() {
           <CardFooter className="flex-col items-start gap-3 px-5 py-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <span className="flex items-center gap-2">
               <span className="size-1.5 rounded-full bg-primary" />
-              Enter or Space also plays the focused key
+              {text.focusedKey}
             </span>
             <span className="font-mono tracking-wide">
-              Notes and uploaded clips play in your browser
+              {text.browserPlayback}
             </span>
           </CardFooter>
         </Card>
@@ -850,16 +1065,16 @@ function KeysWorkspace() {
           <CardHeader className="flex flex-wrap items-center justify-between gap-4 border-b px-5 py-5 sm:px-6">
             <div>
               <h2 id="audio-library-heading" className="text-base font-medium">
-                Audio customization
+                {text.audioCustomization}
               </h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Choose note names or assign audio files stored in this browser.
+                {text.customizationDescription}
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
               <div
                 role="group"
-                aria-label="Sound set"
+                aria-label={text.soundSet}
                 className="flex rounded-md border bg-muted/30 p-0.5"
               >
                 <Button
@@ -909,7 +1124,7 @@ function KeysWorkspace() {
                     setAudioClipsExpanded(true)
                   }}
                 >
-                  Custom Audios
+                  {text.customAudios}
                 </Button>
               </div>
               <Button
@@ -929,20 +1144,20 @@ function KeysWorkspace() {
                 }}
               >
                 <Waves />
-                Hold to sustain
+                {text.holdToSustain}
               </Button>
               {audioClipsExpanded ? (
                 <>
                   <span className="font-mono text-xs text-muted-foreground">
                     {configStatus === 'loading'
-                      ? 'Loading…'
+                      ? text.loading
                       : configStatus === 'saving'
-                        ? 'Saving…'
+                        ? text.saving
                         : configStatus === 'dirty'
-                          ? 'Unsaved changes'
+                          ? text.unsavedChanges
                           : configStatus === 'error'
-                            ? 'Save failed'
-                            : 'Saved in browser'}
+                            ? text.saveFailed
+                            : text.savedInBrowser}
                   </span>
                   <Button
                     type="button"
@@ -957,7 +1172,7 @@ function KeysWorkspace() {
                     {configStatus === 'saving' && (
                       <Loader2 className="animate-spin" />
                     )}
-                    Save assignments
+                    {text.saveAssignments}
                   </Button>
                   <Label
                     className={cn(
@@ -973,7 +1188,7 @@ function KeysWorkspace() {
                     ) : (
                       <Upload className="size-3.5" />
                     )}
-                    {uploading ? 'Uploading…' : 'Upload audio'}
+                    {uploading ? text.uploading : text.uploadAudio}
                     <Input
                       className="sr-only"
                       type="file"
@@ -990,7 +1205,7 @@ function KeysWorkspace() {
                     type="button"
                     size="icon-sm"
                     variant="ghost"
-                    aria-label="Collapse audio clips"
+                    aria-label={text.collapseClips}
                     aria-expanded={true}
                     aria-controls="audio-clips-panel"
                     onClick={() => setAudioClipsExpanded(false)}
@@ -1010,7 +1225,7 @@ function KeysWorkspace() {
                     setAudioClipsExpanded(true)
                   }}
                 >
-                  <ChevronDown /> Manage custom audios
+                  <ChevronDown /> {text.manageAudios}
                 </Button>
               )}
             </div>
@@ -1032,7 +1247,7 @@ function KeysWorkspace() {
                 className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]"
               >
                 <div className="space-y-3">
-                  <h3 className="text-sm font-medium">Key assignments</h3>
+                  <h3 className="text-sm font-medium">{text.keyAssignments}</h3>
                   {activeNotes.map((note) => {
                     const mapping = audioConfig.mappings[note.id]
                     const clip =
@@ -1049,7 +1264,9 @@ function KeysWorkspace() {
                       >
                         <div className="flex items-center pb-1">
                           <span className="text-sm font-medium">
-                            {note.fruit}
+                            {locale === 'pt-BR'
+                              ? note.fruit.replace('Key', 'Tecla')
+                              : note.fruit}
                           </span>
                         </div>
                         <div>
@@ -1057,7 +1274,7 @@ function KeysWorkspace() {
                             htmlFor={`sound-${note.id}`}
                             className="text-xs"
                           >
-                            Sound
+                            {text.sound}
                           </Label>
                           <NativeSelect
                             id={`sound-${note.id}`}
@@ -1089,8 +1306,8 @@ function KeysWorkspace() {
                             }}
                           >
                             <NativeSelectOption value="note">
-                              Generated {formatNote(note.pitch, noteNotation)}{' '}
-                              note
+                              {text.generated}{' '}
+                              {formatNote(note.pitch, noteNotation)} {text.note}
                             </NativeSelectOption>
                             {audioConfig.clips.map((candidate) => (
                               <NativeSelectOption
@@ -1107,7 +1324,7 @@ function KeysWorkspace() {
                             htmlFor={`start-${note.id}`}
                             className="text-xs"
                           >
-                            Start (seconds)
+                            {text.startSeconds}
                           </Label>
                           <Input
                             id={`start-${note.id}`}
@@ -1143,7 +1360,7 @@ function KeysWorkspace() {
                         </div>
                         <div>
                           <Label htmlFor={`end-${note.id}`} className="text-xs">
-                            End (seconds)
+                            {text.endSeconds}
                           </Label>
                           <Input
                             id={`end-${note.id}`}
@@ -1181,16 +1398,18 @@ function KeysWorkspace() {
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium">Browser library</h3>
+                    <h3 className="text-sm font-medium">
+                      {text.browserLibrary}
+                    </h3>
                     <Badge variant="secondary">
-                      {audioConfig.clips.length} clips
+                      {audioConfig.clips.length} {text.clips}
                     </Badge>
                   </div>
                   {audioConfig.clips.length === 0 ? (
                     <div className="grid min-h-40 place-items-center rounded-lg border border-dashed text-center text-sm text-muted-foreground">
                       <div>
                         <FileAudio className="mx-auto mb-2 size-6" />
-                        Upload an audio file to assign it to a key.
+                        {text.uploadToAssign}
                       </div>
                     </div>
                   ) : (
@@ -1222,11 +1441,11 @@ function KeysWorkspace() {
                                 configStatus !== 'saved' ||
                                 uploading
                               }
-                              aria-label={`Delete ${clip.originalName}`}
+                              aria-label={`${text.delete} ${clip.originalName}`}
                               title={
                                 isAssigned
-                                  ? 'Unassign this clip before deleting it.'
-                                  : 'Delete clip'
+                                  ? text.unassignBeforeDelete
+                                  : text.deleteClip
                               }
                               onClick={() => void deleteClip(clip.id)}
                             >
@@ -1268,6 +1487,8 @@ function SerialConnection({
     noteId?: string,
   ) => void
 }) {
+  const { locale } = useLocale()
+  const text = copy[locale]
   const {
     error,
     isAvailableSerialApi,
@@ -1285,7 +1506,7 @@ function SerialConnection({
     maxReceivedDataCount: 256,
     mode: 'text',
   })
-  const [lastEvent, setLastEvent] = useState('Waiting for board input')
+  const [lastEvent, setLastEvent] = useState<SerialEvent>({ kind: 'waiting' })
   const lineBufferRef = useRef('')
   const processedEntriesRef = useRef(new WeakSet<object>())
   const subscriptionRequestedRef = useRef(false)
@@ -1299,7 +1520,27 @@ function SerialConnection({
   const firstKeyNumber = boardIndex * notesPerBoard + 1
   const lastKeyNumber = firstKeyNumber + activeKeysOnBoard - 1
   const lastPinNumber = activeKeysOnBoard - 1
-  const keyRange = `Keys ${firstKeyNumber}-${lastKeyNumber} / A0-A${lastPinNumber}`
+  const keyRange = `${text.keys} ${firstKeyNumber}-${lastKeyNumber} / A0-A${lastPinNumber}`
+  const lastEventText = (() => {
+    switch (lastEvent.kind) {
+      case 'waiting':
+        return text.waitingForBoard
+      case 'disconnected':
+        return text.boardDisconnected
+      case 'invalid':
+        return text.invalidMessage
+      case 'ready':
+        return text.arduinoReady
+      case 'ignored':
+        return `${text.ignored}: ${lastEvent.value}`
+      case 'unknown-key':
+        return `${text.unknownKey}: ${lastEvent.value}`
+      case 'inactive-key':
+        return `${text.inactiveKey} ${lastEvent.keyNumber}`
+      case 'key':
+        return `${lastEvent.action === 'pressed' ? text.pressed : text.released} ${text.key} ${lastEvent.keyNumber}`
+    }
+  })()
 
   const dispatchSerialKey = useEffectEvent(
     (action: SerialKeyAction, noteId?: string) =>
@@ -1316,7 +1557,7 @@ function SerialConnection({
       lineBufferRef.current = ''
       if (wasConnectedRef.current) {
         dispatchSerialKey('reset')
-        setLastEvent('Board disconnected')
+        setLastEvent({ kind: 'disconnected' })
       }
       wasConnectedRef.current = false
       return
@@ -1344,20 +1585,20 @@ function SerialConnection({
       lineBufferRef.current = lines.pop() ?? ''
       if (lineBufferRef.current.length > 256) {
         lineBufferRef.current = ''
-        setLastEvent('Ignored an invalid serial message')
+        setLastEvent({ kind: 'invalid' })
       }
 
       for (const rawLine of lines) {
         const line = rawLine.trim()
         if (!line) continue
         if (line === 'READY:FRUIT-KEYBOARD') {
-          setLastEvent('Arduino is ready')
+          setLastEvent({ kind: 'ready' })
           continue
         }
 
         const match = /^(DOWN|UP):([a-z][a-z0-9-]*)$/.exec(line)
         if (!match) {
-          setLastEvent(`Ignored: ${line.slice(0, 40)}`)
+          setLastEvent({ kind: 'ignored', value: line.slice(0, 40) })
           continue
         }
 
@@ -1368,18 +1609,20 @@ function SerialConnection({
           (candidate) => candidate === noteId,
         )
         if (localKeyIndex < 0) {
-          setLastEvent(`Ignored unknown key: ${noteId}`)
+          setLastEvent({ kind: 'unknown-key', value: noteId })
           continue
         }
         const keyNumber = boardIndex * notesPerBoard + localKeyIndex + 1
         if (keyNumber > activeKeyCount) {
-          setLastEvent(`Ignored inactive key ${keyNumber}`)
+          setLastEvent({ kind: 'inactive-key', keyNumber })
           continue
         }
         dispatchSerialKey(command === 'DOWN' ? 'down' : 'up', noteId)
-        setLastEvent(
-          `${command === 'DOWN' ? 'Pressed' : 'Released'} key ${keyNumber}`,
-        )
+        setLastEvent({
+          kind: 'key',
+          action: command === 'DOWN' ? 'pressed' : 'released',
+          keyNumber,
+        })
       }
     }
   }, [receivedData])
@@ -1390,10 +1633,9 @@ function SerialConnection({
     return (
       <Alert className="border-amber-500/30 bg-amber-500/10 p-6 lg:col-span-2">
         <PlugZap className="mb-3 size-6 text-amber-500" />
-        <AlertTitle className="text-lg">Web Serial unavailable</AlertTitle>
+        <AlertTitle className="text-lg">{text.webSerialUnavailable}</AlertTitle>
         <AlertDescription className="mt-2 leading-6">
-          Use desktop Chrome or Edge over HTTPS or localhost to connect both
-          boards. Browser keys still work without them.
+          {text.serialUnavailableDescription}
         </AlertDescription>
       </Alert>
     )
@@ -1407,7 +1649,9 @@ function SerialConnection({
             Arduino {boardNumber} · {keyRange}
           </p>
           <h2 className="mt-1 text-base font-medium">
-            {isConnected ? 'Board connected' : `Connect board ${boardNumber}`}
+            {isConnected
+              ? text.boardConnected
+              : `${text.connectBoard} ${boardNumber}`}
           </h2>
         </div>
         <Badge
@@ -1423,17 +1667,21 @@ function SerialConnection({
               isConnected ? 'bg-emerald-500' : 'bg-muted-foreground/50',
             )}
           />
-          {isConnected ? (isSubscribing ? 'Listening' : 'Opening') : 'Offline'}
+          {isConnected
+            ? isSubscribing
+              ? text.listening
+              : text.opening
+            : text.offline}
         </Badge>
       </CardHeader>
 
       <CardContent className="px-0 pt-5">
         <div className="rounded-lg border bg-muted/30 px-3 py-3">
           <p className="font-mono text-[0.62rem] tracking-[0.14em] text-muted-foreground uppercase">
-            Last serial event
+            {text.lastSerialEvent}
           </p>
           <p className="mt-1 truncate font-mono text-xs" aria-live="polite">
-            {lastEvent}
+            {lastEventText}
           </p>
         </div>
 
@@ -1443,7 +1691,7 @@ function SerialConnection({
             className="mt-5 h-10 w-full"
             onClick={() => void disconnect()}
           >
-            <Unplug /> Disconnect
+            <Unplug /> {text.disconnect}
           </Button>
         ) : (
           <Button
@@ -1456,21 +1704,21 @@ function SerialConnection({
           >
             <Cable />{' '}
             {isConnecting
-              ? 'Selecting port...'
-              : `Select Arduino ${boardNumber}`}
+              ? text.selectingPort
+              : `${text.selectArduino} ${boardNumber}`}
           </Button>
         )}
 
         <p className="mt-3 text-center font-mono text-[0.65rem] text-muted-foreground">
           {isConnected
             ? `USB ${portInfo?.usbVendorId ?? '-'}:${portInfo?.usbProductId ?? '-'}`
-            : 'Port selection requires a click'}
+            : text.clickToSelect}
         </p>
       </CardContent>
 
       {(error || isUserCancelled) && (
         <Alert variant="destructive" className="mt-4 text-xs">
-          {error?.message ?? 'Port selection was cancelled.'}
+          {error?.message ?? text.cancelled}
         </Alert>
       )}
     </div>
