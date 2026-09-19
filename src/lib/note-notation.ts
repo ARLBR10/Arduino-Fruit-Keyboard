@@ -5,9 +5,9 @@ const solfegeNames: Readonly<Record<string, string>> = {
   D: 'Ré',
   E: 'Mi',
   F: 'Fa',
-  G: 'So',
+  G: 'Sol',
   A: 'La',
-  B: 'Ci',
+  B: 'Si',
 }
 
 export function formatNote(pitch: string, notation: NoteNotation) {

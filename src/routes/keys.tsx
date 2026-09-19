@@ -8,7 +8,6 @@ import {
   Trash2,
   Unplug,
   Upload,
-  Volume2,
   Waves,
 } from 'lucide-react'
 import {
@@ -54,7 +53,6 @@ const fruitNotes = [
   {
     id: 'apple',
     fruit: 'Key 1',
-    emoji: '🍎',
     pitch: 'C4',
     frequency: 261.63,
     shortcut: 'a',
@@ -64,7 +62,6 @@ const fruitNotes = [
   {
     id: 'banana',
     fruit: 'Key 2',
-    emoji: '🍌',
     pitch: 'D4',
     frequency: 293.66,
     shortcut: 's',
@@ -74,7 +71,6 @@ const fruitNotes = [
   {
     id: 'orange',
     fruit: 'Key 3',
-    emoji: '🍊',
     pitch: 'E4',
     frequency: 329.63,
     shortcut: 'd',
@@ -84,7 +80,6 @@ const fruitNotes = [
   {
     id: 'lemon',
     fruit: 'Key 4',
-    emoji: '🍋',
     pitch: 'F4',
     frequency: 349.23,
     shortcut: 'f',
@@ -94,7 +89,6 @@ const fruitNotes = [
   {
     id: 'watermelon',
     fruit: 'Key 5',
-    emoji: '🍉',
     pitch: 'G4',
     frequency: 392,
     shortcut: 'g',
@@ -104,7 +98,6 @@ const fruitNotes = [
   {
     id: 'grapes',
     fruit: 'Key 6',
-    emoji: '🍇',
     pitch: 'A4',
     frequency: 440,
     shortcut: 'h',
@@ -114,7 +107,6 @@ const fruitNotes = [
   {
     id: 'strawberry',
     fruit: 'Key 7',
-    emoji: '🍓',
     pitch: 'B4',
     frequency: 493.88,
     shortcut: 'j',
@@ -124,7 +116,6 @@ const fruitNotes = [
   {
     id: 'pineapple',
     fruit: 'Key 8',
-    emoji: '🍍',
     pitch: 'C5',
     frequency: 523.25,
     shortcut: 'k',
@@ -134,7 +125,6 @@ const fruitNotes = [
   {
     id: 'cherry',
     fruit: 'Key 9',
-    emoji: '🍒',
     pitch: 'D5',
     frequency: 587.33,
     shortcut: 'l',
@@ -144,7 +134,6 @@ const fruitNotes = [
   {
     id: 'pear',
     fruit: 'Key 10',
-    emoji: '🍐',
     pitch: 'E5',
     frequency: 659.25,
     shortcut: ';',
@@ -154,7 +143,6 @@ const fruitNotes = [
   {
     id: 'peach',
     fruit: 'Key 11',
-    emoji: '🍑',
     pitch: 'F5',
     frequency: 698.46,
     shortcut: "'",
@@ -164,7 +152,6 @@ const fruitNotes = [
   {
     id: 'kiwi',
     fruit: 'Key 12',
-    emoji: '🥝',
     pitch: 'G5',
     frequency: 783.99,
     shortcut: '\\',
@@ -660,53 +647,25 @@ function KeysWorkspace() {
           </Alert>
         )}
 
-        <section className="grid gap-5 py-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <Card className="relative p-6">
-            <div
-              aria-hidden="true"
-              className="absolute -top-20 -right-14 size-48 rounded-full bg-primary/10 blur-3xl"
-            />
-            <div className="relative">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="flex items-center gap-2">
-                  <Volume2 className="size-4" />
-                  Output
-                </span>
-                <span>Local</span>
-              </div>
-              <div className="mt-10 flex items-end gap-1.5" aria-hidden="true">
-                {[28, 45, 34, 64, 42, 78, 52, 32, 58, 40, 70, 27].map(
-                  (height, index) => (
-                    <span
-                      key={index}
-                      className="w-full rounded-full bg-primary/60"
-                      style={{ height: `${height}px` }}
-                    />
-                  ),
-                )}
-              </div>
-              <div className="mt-8 flex items-end justify-between gap-4 border-t pt-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">Last sound</p>
-                  <p className="mt-1 text-2xl font-semibold">
-                    {lastPlayedClip?.originalName ??
-                      (lastPlayed
-                        ? formatNote(lastPlayed.pitch, noteNotation)
-                        : '--')}
-                  </p>
-                </div>
-                <p
-                  className="max-w-28 text-right text-xs leading-5 text-muted-foreground"
-                  aria-live="polite"
-                >
-                  {lastPlayed
-                    ? `${lastPlayed.fruit} ${lastPlayedClip ? 'audio clip' : 'tone'} playing locally`
-                    : 'Play any key to begin'}
+        <Card
+          className="mt-6 gap-0 py-0"
+          role="region"
+          aria-labelledby="arduino-heading"
+        >
+          <CardHeader className="border-b px-5 py-5 sm:px-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 id="arduino-heading" className="text-base font-medium">
+                  Arduino connections
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Connect and monitor the boards that send key events.
                 </p>
               </div>
+              <Badge variant="secondary">Arduino optional</Badge>
             </div>
-          </Card>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+          </CardHeader>
+          <CardContent className="grid gap-4 p-4 sm:p-6 lg:grid-cols-2">
             {activeBoardIndexes.map((boardIndex) => (
               <SerialProvider key={boardIndex}>
                 <SerialConnection
@@ -717,27 +676,38 @@ function KeysWorkspace() {
                 />
               </SerialProvider>
             ))}
-          </div>
-        </section>
+          </CardContent>
+        </Card>
 
         <Card
           role="region"
           aria-labelledby="instrument-heading"
-          className="gap-0 py-0"
+          className="mt-6 gap-0 py-0"
         >
           <CardHeader className="flex flex-wrap items-end justify-between gap-4 border-b px-5 py-5 sm:px-6">
-            <div>
+            <div className="min-w-0">
               <h2 id="instrument-heading" className="text-base font-medium">
-                Instrument
+                Keys
               </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Click, touch, or use the shown keyboard shortcuts.
+              </p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
-              <p className="font-mono text-xs text-muted-foreground">
-                Click, touch, or use{' '}
-                {activeNotes
-                  .map((note) => note.shortcut.toUpperCase())
-                  .join(' ')}
-              </p>
+              <div className="min-w-32 rounded-lg border bg-muted/30 px-3 py-2">
+                <p className="font-mono text-[0.6rem] tracking-wider text-muted-foreground uppercase">
+                  Last sound
+                </p>
+                <p
+                  className="mt-0.5 max-w-48 truncate text-sm font-medium"
+                  aria-live="polite"
+                >
+                  {lastPlayedClip?.originalName ??
+                    (lastPlayed
+                      ? `${lastPlayed.fruit} · ${formatNote(lastPlayed.pitch, noteNotation)}`
+                      : 'Play a key to begin')}
+                </p>
+              </div>
               <div className="flex items-center gap-2">
                 <Label htmlFor="key-count" className="text-xs">
                   Keys
@@ -758,80 +728,6 @@ function KeysWorkspace() {
                   ))}
                 </NativeSelect>
               </div>
-              <div
-                role="group"
-                aria-label="Sound set"
-                className="flex rounded-md border bg-muted/30 p-0.5"
-              >
-                <Button
-                  type="button"
-                  variant={
-                    !useAudioClips && noteNotation === 'letter'
-                      ? 'secondary'
-                      : 'ghost'
-                  }
-                  size="sm"
-                  className="h-7 px-2.5 font-mono text-xs"
-                  aria-pressed={!useAudioClips && noteNotation === 'letter'}
-                  onClick={() => {
-                    setNoteNotation('letter')
-                    setUseAudioClips(false)
-                    setAudioClipsExpanded(false)
-                  }}
-                >
-                  C D E
-                </Button>
-                <Button
-                  type="button"
-                  variant={
-                    !useAudioClips && noteNotation === 'solfege'
-                      ? 'secondary'
-                      : 'ghost'
-                  }
-                  size="sm"
-                  className="h-7 px-2.5 text-xs"
-                  aria-pressed={!useAudioClips && noteNotation === 'solfege'}
-                  onClick={() => {
-                    setNoteNotation('solfege')
-                    setUseAudioClips(false)
-                    setAudioClipsExpanded(false)
-                  }}
-                >
-                  Dó Ré Mi
-                </Button>
-                <Button
-                  type="button"
-                  variant={useAudioClips ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-7 px-2.5 text-xs"
-                  aria-pressed={useAudioClips}
-                  onClick={() => {
-                    setUseAudioClips(true)
-                    setAudioClipsExpanded(true)
-                  }}
-                >
-                  Audios
-                </Button>
-              </div>
-              <Button
-                type="button"
-                variant={sustainOnHold ? 'default' : 'outline'}
-                size="sm"
-                aria-pressed={sustainOnHold}
-                disabled={
-                  configStatus === 'loading' ||
-                  configStatus === 'saving' ||
-                  uploading
-                }
-                onClick={() => {
-                  if (sustainOnHold) stopSustainedNotes()
-                  setSustainOnHold((enabled) => !enabled)
-                  setConfigStatus('dirty')
-                }}
-              >
-                <Waves />
-                Hold to sustain
-              </Button>
             </div>
           </CardHeader>
 
@@ -907,10 +803,7 @@ function KeysWorkspace() {
                     aria-hidden="true"
                     className={`absolute -top-10 -right-8 size-28 rounded-full bg-primary/20 blur-2xl transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}`}
                   />
-                  <span className="relative flex items-start justify-between gap-2">
-                    <span className="grid size-11 place-items-center rounded-lg border bg-background/60 text-3xl transition-transform group-hover:scale-105">
-                      {note.emoji}
-                    </span>
+                  <span className="relative flex items-start justify-end gap-2">
                     <span className="rounded-md border bg-background/60 px-2 py-1 font-mono text-[0.65rem] font-semibold text-muted-foreground">
                       {note.shortcut.toUpperCase()}
                     </span>
@@ -954,102 +847,173 @@ function KeysWorkspace() {
           className="mt-6 gap-0 py-0"
           aria-labelledby="audio-library-heading"
         >
-          <CardHeader
-            className={cn(
-              'flex flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-6',
-              audioClipsExpanded && 'border-b',
-            )}
-          >
+          <CardHeader className="flex flex-wrap items-center justify-between gap-4 border-b px-5 py-5 sm:px-6">
             <div>
               <h2 id="audio-library-heading" className="text-base font-medium">
-                Audio clips
+                Audio customization
               </h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Files and key assignments are stored only in this browser.
+                Choose note names or assign audio files stored in this browser.
               </p>
             </div>
-            {audioClipsExpanded ? (
-              <div className="flex items-center gap-3">
-                <span className="font-mono text-xs text-muted-foreground">
-                  {configStatus === 'loading'
-                    ? 'Loading…'
-                    : configStatus === 'saving'
-                      ? 'Saving…'
-                      : configStatus === 'dirty'
-                        ? 'Unsaved changes'
-                        : configStatus === 'error'
-                          ? 'Save failed'
-                          : 'Saved in browser'}
-                </span>
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <div
+                role="group"
+                aria-label="Sound set"
+                className="flex rounded-md border bg-muted/30 p-0.5"
+              >
+                <Button
+                  type="button"
+                  variant={
+                    !useAudioClips && noteNotation === 'letter'
+                      ? 'secondary'
+                      : 'ghost'
+                  }
+                  size="sm"
+                  className="h-7 px-2.5 font-mono text-xs"
+                  aria-pressed={!useAudioClips && noteNotation === 'letter'}
+                  onClick={() => {
+                    setNoteNotation('letter')
+                    setUseAudioClips(false)
+                    setAudioClipsExpanded(false)
+                  }}
+                >
+                  C D E
+                </Button>
+                <Button
+                  type="button"
+                  variant={
+                    !useAudioClips && noteNotation === 'solfege'
+                      ? 'secondary'
+                      : 'ghost'
+                  }
+                  size="sm"
+                  className="h-7 px-2.5 text-xs"
+                  aria-pressed={!useAudioClips && noteNotation === 'solfege'}
+                  onClick={() => {
+                    setNoteNotation('solfege')
+                    setUseAudioClips(false)
+                    setAudioClipsExpanded(false)
+                  }}
+                >
+                  Dó Ré Mi Fa Sol La Si
+                </Button>
+                <Button
+                  type="button"
+                  variant={useAudioClips ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2.5 text-xs"
+                  aria-pressed={useAudioClips}
+                  onClick={() => {
+                    setUseAudioClips(true)
+                    setAudioClipsExpanded(true)
+                  }}
+                >
+                  Custom Audios
+                </Button>
+              </div>
+              <Button
+                type="button"
+                variant={sustainOnHold ? 'default' : 'outline'}
+                size="sm"
+                aria-pressed={sustainOnHold}
+                disabled={
+                  configStatus === 'loading' ||
+                  configStatus === 'saving' ||
+                  uploading
+                }
+                onClick={() => {
+                  if (sustainOnHold) stopSustainedNotes()
+                  setSustainOnHold((enabled) => !enabled)
+                  setConfigStatus('dirty')
+                }}
+              >
+                <Waves />
+                Hold to sustain
+              </Button>
+              {audioClipsExpanded ? (
+                <>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {configStatus === 'loading'
+                      ? 'Loading…'
+                      : configStatus === 'saving'
+                        ? 'Saving…'
+                        : configStatus === 'dirty'
+                          ? 'Unsaved changes'
+                          : configStatus === 'error'
+                            ? 'Save failed'
+                            : 'Saved in browser'}
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={
+                      configStatus === 'loading' ||
+                      configStatus === 'saving' ||
+                      uploading
+                    }
+                    onClick={() => void saveConfiguration()}
+                  >
+                    {configStatus === 'saving' && (
+                      <Loader2 className="animate-spin" />
+                    )}
+                    Save assignments
+                  </Button>
+                  <Label
+                    className={cn(
+                      'inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-md border bg-background px-2.5 text-[0.8rem] font-medium hover:bg-muted',
+                      (uploading ||
+                        configStatus === 'loading' ||
+                        configStatus === 'saving') &&
+                        'pointer-events-none opacity-50',
+                    )}
+                  >
+                    {uploading ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="size-3.5" />
+                    )}
+                    {uploading ? 'Uploading…' : 'Upload audio'}
+                    <Input
+                      className="sr-only"
+                      type="file"
+                      accept="audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm,audio/x-m4a,audio/x-wav"
+                      disabled={
+                        uploading ||
+                        configStatus === 'loading' ||
+                        configStatus === 'saving'
+                      }
+                      onChange={(event) => void uploadClip(event)}
+                    />
+                  </Label>
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Collapse audio clips"
+                    aria-expanded={true}
+                    aria-controls="audio-clips-panel"
+                    onClick={() => setAudioClipsExpanded(false)}
+                  >
+                    <ChevronDown className="rotate-180" />
+                  </Button>
+                </>
+              ) : (
                 <Button
                   type="button"
                   size="sm"
-                  disabled={
-                    configStatus === 'loading' ||
-                    configStatus === 'saving' ||
-                    uploading
-                  }
-                  onClick={() => void saveConfiguration()}
-                >
-                  {configStatus === 'saving' && (
-                    <Loader2 className="animate-spin" />
-                  )}
-                  Save assignments
-                </Button>
-                <Label
-                  className={cn(
-                    'inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-md border bg-background px-2.5 text-[0.8rem] font-medium hover:bg-muted',
-                    (uploading ||
-                      configStatus === 'loading' ||
-                      configStatus === 'saving') &&
-                      'pointer-events-none opacity-50',
-                  )}
-                >
-                  {uploading ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Upload className="size-3.5" />
-                  )}
-                  {uploading ? 'Uploading…' : 'Upload audio'}
-                  <Input
-                    className="sr-only"
-                    type="file"
-                    accept="audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm,audio/x-m4a,audio/x-wav"
-                    disabled={
-                      uploading ||
-                      configStatus === 'loading' ||
-                      configStatus === 'saving'
-                    }
-                    onChange={(event) => void uploadClip(event)}
-                  />
-                </Label>
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label="Collapse audio clips"
-                  aria-expanded={true}
+                  variant="outline"
+                  aria-expanded={false}
                   aria-controls="audio-clips-panel"
-                  onClick={() => setAudioClipsExpanded(false)}
+                  onClick={() => {
+                    setUseAudioClips(true)
+                    setAudioClipsExpanded(true)
+                  }}
                 >
-                  <ChevronDown className="rotate-180" />
+                  <ChevronDown /> Manage custom audios
                 </Button>
-              </div>
-            ) : (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                aria-expanded={false}
-                aria-controls="audio-clips-panel"
-                onClick={() => {
-                  setUseAudioClips(true)
-                  setAudioClipsExpanded(true)
-                }}
-              >
-                <ChevronDown /> Expand audio clips
-              </Button>
-            )}
+              )}
+            </div>
           </CardHeader>
 
           {audioClipsExpanded && (
@@ -1083,10 +1047,7 @@ function KeysWorkspace() {
                         key={note.id}
                         className="grid gap-3 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[7rem_minmax(0,1fr)_8rem_8rem] sm:items-end"
                       >
-                        <div className="flex items-center gap-2 pb-1">
-                          <span className="text-xl" aria-hidden="true">
-                            {note.emoji}
-                          </span>
+                        <div className="flex items-center pb-1">
                           <span className="text-sm font-medium">
                             {note.fruit}
                           </span>
@@ -1427,7 +1388,7 @@ function SerialConnection({
     if (boardIndex === 1) return null
 
     return (
-      <Alert className="border-amber-500/30 bg-amber-500/10 p-6 sm:col-span-2 xl:col-span-1">
+      <Alert className="border-amber-500/30 bg-amber-500/10 p-6 lg:col-span-2">
         <PlugZap className="mb-3 size-6 text-amber-500" />
         <AlertTitle className="text-lg">Web Serial unavailable</AlertTitle>
         <AlertDescription className="mt-2 leading-6">
@@ -1439,7 +1400,7 @@ function SerialConnection({
   }
 
   return (
-    <Card role="complementary" className="gap-0 p-5">
+    <div role="complementary" className="rounded-xl border bg-muted/10 p-5">
       <CardHeader className="flex-row items-start justify-between gap-4 px-0">
         <div>
           <p className="text-xs text-muted-foreground">
@@ -1512,6 +1473,6 @@ function SerialConnection({
           {error?.message ?? 'Port selection was cancelled.'}
         </Alert>
       )}
-    </Card>
+    </div>
   )
 }

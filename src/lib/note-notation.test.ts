@@ -9,9 +9,9 @@ const noteNames = [
   ['D4', 'Ré4'],
   ['E4', 'Mi4'],
   ['F4', 'Fa4'],
-  ['G4', 'So4'],
+  ['G4', 'Sol4'],
   ['A4', 'La4'],
-  ['B4', 'Ci4'],
+  ['B4', 'Si4'],
 ] as const
 
 test('letter notation keeps the current pitch labels', () => {
